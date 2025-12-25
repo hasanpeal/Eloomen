@@ -1,0 +1,19 @@
+# Build results
+bin/
+obj/
+
+
+# User Secrets (local development secrets stored outside project)
+**/Properties/secrets.json
+
+# .env files (NEVER commit these!)
+.env
+.env.*
+.env.local
+.env.development
+.env.production
+.env.development.local
+.env.test.local
+.env.production.local
+.vscode/
+.idea/
