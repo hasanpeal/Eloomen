@@ -1,5 +1,7 @@
 # Eloomen
 
+> **README.md**
+
 **Eloomen** is a secure, relationship-based digital vault platform that allows users to store, organize, and share sensitive data with specific people or groups — **immediately, conditionally, or at a future time** (including preset “expected death” dates).
 
 Eloomen is not just a password manager or document storage app.  
@@ -37,8 +39,8 @@ Eloomen is built around **four core ideas**:
 ### 📁 Documents
 - PNG, JPG, PDF, DOCX, XLSX, etc.
 - Custom titles & metadata
-- Stored securely in Amazon S3
-- Versionable
+- Stored securely using Supabase Storage
+- Version-ready design
 
 ### 🔑 Password Records
 - Banks, subscriptions, websites
@@ -46,7 +48,7 @@ Eloomen is built around **four core ideas**:
 - Custom fields supported
 
 ### ₿ Crypto Wallet Info
-- Encrypted seed phrases
+- Encrypted seed phrases / private keys
 - Wallet type & blockchain
 - Public address + notes
 
@@ -80,10 +82,11 @@ Policy types:
 
 ## 🏗️ Architecture Overview
 
-Frontend (Next.js)  
-→ ASP.NET Core API (.NET + JWT)  
-→ PostgreSQL (RDS) + Amazon S3  
-→ SNS + SQS for background workflows
+**Frontend (Next.js)**  
+→ **ASP.NET Core API (.NET 8 + JWT)**  
+→ **PostgreSQL (Supabase)**  
+→ **Supabase Storage (documents & files)**  
+→ **RabbitMQ (background workflows & policy execution)**
 
 ---
 
@@ -93,30 +96,38 @@ Frontend (Next.js)
 - Next.js (TypeScript)
 - TailwindCSS
 - JWT authentication
-- WebCrypto API
+- WebCrypto API (client-side encryption)
 
 ### Backend
 - ASP.NET Core (.NET 8)
 - Custom JWT Auth (Access + Refresh tokens)
 - Policy-based authorization
+- Background workers for policy evaluation
 
 ### Database
-- PostgreSQL (relational, FK-based)
+- PostgreSQL (Supabase)
+- Fully relational (foreign keys, transactions)
 
 ### Storage
-- Amazon S3 (private buckets, pre-signed URLs)
+- Supabase Storage
+- Private buckets
+- Signed URLs for upload/download
 
 ### Messaging
-- Amazon SNS + SQS
+- **RabbitMQ**
+- Asynchronous policy execution
+- Inactivity checks
+- Delayed releases
+- Audit event processing
 
 ### CI/CD
-- GitLab CI/CD
+- GitHub Actions
 
 ---
 
 ## 🔑 Authentication & Authorization
 
-- JWT Access Tokens
+- JWT Access Tokens (short-lived)
 - Rotating Refresh Tokens
 - MFA for sensitive actions
 - Role + policy-based access control
@@ -142,15 +153,16 @@ Core tables include:
 - Encrypted storage
 - Time-boxed access
 - Full audit logging
+- Explicit user consent for all delayed releases
 
 ---
 
-## 🚀 CI/CD (GitLab)
+## 🚀 CI/CD (GitHub Actions)
 
 Pipeline stages:
 1. Build & test
 2. Docker image creation
-3. Migrations
+3. Database migrations
 4. Deployment
 5. Smoke tests
 
@@ -167,10 +179,10 @@ Pipeline stages:
 
 ## 📌 Future Enhancements
 
-- Mobile apps
+- Mobile apps (iOS / Android)
 - Hardware key support
 - Encrypted search
-- Enterprise plans
+- Enterprise & family plans
 
 ---
 
