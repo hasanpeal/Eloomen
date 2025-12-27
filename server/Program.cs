@@ -1,3 +1,5 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +40,9 @@ builder.Services.AddIdentity<User, IdentityRole>(options =>
     options.Password.RequireUppercase = true;
     options.Password.RequireNonAlphanumeric = true;
     options.Password.RequiredLength = 8;
+    options.User.RequireUniqueEmail = true;
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.AllowedForNewUsers = true;
 })
 .AddEntityFrameworkStores<ApplicationDBContext>()
 .AddDefaultTokenProviders();
@@ -60,6 +65,34 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SigningKey"]!)
             )
+        };
+        
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var userManager = context.HttpContext.RequestServices
+                    .GetRequiredService<UserManager<User>>();
+
+                var userId = context.Principal?
+                    .FindFirstValue(JwtRegisteredClaimNames.Sub);
+
+                var tokenStamp = context.Principal?
+                    .FindFirst("security_stamp")?.Value;
+
+                if (userId == null || tokenStamp == null)
+                {
+                    context.Fail("Invalid token");
+                    return;
+                }
+
+                var user = await userManager.FindByIdAsync(userId);
+
+                if (user == null || user.SecurityStamp != tokenStamp)
+                {
+                    context.Fail("Token revoked");
+                }
+            }
         };
     });
 
@@ -106,6 +139,7 @@ builder.Services.AddSwaggerGen(option =>
 // App Services
 // --------------------
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IDeviceService, DeviceService>();
 
 var app = builder.Build();
 

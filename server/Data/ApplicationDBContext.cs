@@ -11,6 +11,9 @@ public class ApplicationDBContext : IdentityDbContext<User>
     {
     }
 
+    public DbSet<UserDevice> UserDevices { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -30,6 +33,40 @@ public class ApplicationDBContext : IdentityDbContext<User>
             new IdentityRole { Id = "2", Name = "User", NormalizedName = "USER" }
         };
         builder.Entity<IdentityRole>().HasData(roles);
+        
+        // UserDevices configuration
+        builder.Entity<UserDevice>(entity =>
+        {
+            entity.ToTable("UserDevices");
+            entity.HasIndex(e => new { e.UserId, e.DeviceIdentifier }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+            
+            entity.HasMany(e => e.RefreshTokens)
+                .WithOne(e => e.UserDevice)
+                .HasForeignKey(e => e.UserDeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        
+        // RefreshTokens configuration
+        builder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("RefreshTokens");
+            entity.HasIndex(e => e.Token).IsUnique();
+            entity.HasIndex(e => e.UserDeviceId);
+            entity.HasIndex(e => e.ExpiresAt);
+            
+            entity.HasOne(e => e.UserDevice)
+                .WithMany(e => e.RefreshTokens)
+                .HasForeignKey(e => e.UserDeviceId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+        });
     }
 
     // Add DbSet properties for your entities here
