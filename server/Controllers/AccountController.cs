@@ -1,5 +1,10 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using server.Dtos.Account;
 using server.Interfaces;
@@ -15,14 +20,24 @@ public class AccountController : ControllerBase
     private readonly SignInManager<User> _signInManager;
     private readonly ITokenService _tokenService;
     private readonly IDeviceService _deviceService;
+    private readonly IEmailService _emailService;
     private readonly IConfiguration _config;
     private readonly ApplicationDBContext _dbContext;
-    public AccountController(UserManager<User> userManager, SignInManager<User> signInManager, ITokenService tokenService, IDeviceService deviceService, IConfiguration config, ApplicationDBContext dbContext)
+    
+    public AccountController(
+        UserManager<User> userManager, 
+        SignInManager<User> signInManager, 
+        ITokenService tokenService, 
+        IDeviceService deviceService,
+        IEmailService emailService,
+        IConfiguration config, 
+        ApplicationDBContext dbContext)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _tokenService = tokenService;
         _deviceService = deviceService;
+        _emailService = emailService;
         _config = config;
         _dbContext = dbContext;
     }
@@ -30,61 +45,62 @@ public class AccountController : ControllerBase
     [HttpPost("register")]
     public async Task<ActionResult> Register([FromBody] RegisterDTO dto)
     {
-        try
-        {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
 
-            if (await _userManager.FindByEmailAsync(dto.Email) != null ||
-                await _userManager.FindByNameAsync(dto.Username) != null)
-            {
-                return BadRequest("User already exists");
-            }
-            var user = new User()
-            {
-                UserName = dto.Username,
-                Email = dto.Email,
-                EmailConfirmed = false,
-            };
-            
-            // Password hashing is handled by userManager
-            var createdUser = await _userManager.CreateAsync(user, dto.Password);
-            var deviceIdentifier = HttpContext.Request.Headers["X-Device-Id"].ToString();
-            
-            if (createdUser.Succeeded)
-            {
-                var roleResult = await _userManager.AddToRoleAsync(user, "User");
-                var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                // TO BE IMPLEMENTED: Sent confirmation email
-                
-                var device = await _deviceService.GetOrCreateDeviceAsync(user, deviceIdentifier);
-                await _dbContext.SaveChangesAsync(); // Save device if it was newly created
-                
-                if (roleResult.Succeeded)
-                {
-                    return Ok(
-                        new
-                        {
-                            RequireVerification = true,
-                            Message = "Check your email for verification.",
-                        });
-                }
-                else
-                {
-                    return StatusCode(500, roleResult.Errors.Select(x => x.Description).ToArray());
-                }
-            }
-            else
-            {
-                return StatusCode(500, createdUser.Errors.Select(x => x.Description).ToArray());
-            }
-        }
-        catch (Exception e)
+        if (await _userManager.FindByEmailAsync(dto.Email) != null ||
+            await _userManager.FindByNameAsync(dto.Username) != null)
         {
-            return StatusCode(500, "Internal Server Error");
+            return BadRequest("User already exists");
         }
+
+        var user = new User
+        {
+            UserName = dto.Username,
+            Email = dto.Email,
+            EmailConfirmed = false
+        };
+
+        // Create user (Identity handles persistence)
+        var createResult = await _userManager.CreateAsync(user, dto.Password);
+        if (!createResult.Succeeded)
+            return StatusCode(500, createResult.Errors.Select(e => e.Description));
+
+        // Add role
+        var roleResult = await _userManager.AddToRoleAsync(user, "User");
+        if (!roleResult.Succeeded)
+            return StatusCode(500, roleResult.Errors.Select(e => e.Description));
+
+        // Device creation
+        var deviceIdentifier = GetOrCreateDeviceId();
+        await _deviceService.GetOrCreateDeviceAsync(user.Id, deviceIdentifier);
+        
+        await _dbContext.SaveChangesAsync();
+
+        // Reload user after possible changes
+        user = await _userManager.FindByIdAsync(user.Id);
+
+        // Generate verification code
+        var emailVerificationExpiration = int.Parse(_config["App:VerificationCodeExpiration:EmailVerificationMinutes"]);
+        var code = await CreateAndStoreVerificationCodeAsync(user.Id, "EmailVerification", emailVerificationExpiration);
+
+        // Send email
+        var baseUrl = _config["App:BaseUrl"];
+        var verificationPath = _config["App:EmailVerificationPath"];
+        var verificationUrl = $"{baseUrl}{verificationPath}";
+
+        await _emailService.SendEmailConfirmationAsync(
+            user.Email!,
+            user.UserName!,
+            code,
+            verificationUrl
+        );
+
+        return Ok(new
+        {
+            RequireVerification = true,
+            Message = "Check your email for verification."
+        });
     }
 
     [HttpPost("login")]
@@ -95,20 +111,38 @@ public class AccountController : ControllerBase
             return BadRequest(ModelState);
         }
         
-        var user = await _userManager.FindByNameAsync(dto.Username);
-        if(user == null) return Unauthorized("Username or password is incorrect");
-        var result = await _signInManager.CheckPasswordSignInAsync(user, dto.Password, true);
-        if(!result.Succeeded) return Unauthorized("Username or password is incorrect");
+        // Try to find user by username or email
+        User? user = null;
         
-        // Extract unique device identifier
-        string deviceIdentifier = HttpContext.Request.Headers["X-Device-Id"].ToString();
-        var device = await _deviceService.GetOrCreateDeviceAsync(user, deviceIdentifier);
+        // First, try to find by username
+        user = await _userManager.FindByNameAsync(dto.UsernameOrEmail);
+        
+        // If not found by username, try to find by email
+        if (user == null)
+        {
+            user = await _userManager.FindByEmailAsync(dto.UsernameOrEmail);
+        }
+        
+        if(user == null) return Unauthorized("Login credentials are incorrect");
+        var result = await _signInManager.CheckPasswordSignInAsync(user, dto.Password, true);
+        if(!result.Succeeded) return Unauthorized("Login credentials are incorrect");
+        
+        // Get or generate device identifier (backend-controlled, stored in secure cookie)
+        string deviceIdentifier = GetOrCreateDeviceId();
+        var device = await _deviceService.GetOrCreateDeviceAsync(user.Id, deviceIdentifier);
         await _dbContext.SaveChangesAsync(); // Save device if it was newly created
         
         if (!device.IsVerified)
         {
-            var token = await _userManager.GenerateTwoFactorTokenAsync(user, _config["Jwt:Issuer"] + "-Device-" + deviceIdentifier);
-            // TO BE IMPLEMENTED: Email send logic for device verification
+            // Generate device verification code
+            var deviceVerificationExpiration = int.Parse(_config["App:VerificationCodeExpiration:DeviceVerificationMinutes"]);
+            var code = await CreateAndStoreVerificationCodeAsync(user.Id, "DeviceVerification", deviceVerificationExpiration);
+            // Send device verification email
+            var baseUrl = _config["App:BaseUrl"];
+            var verificationPath = _config["App:DeviceVerificationPath"];
+            var verificationUrl = $"{baseUrl}{verificationPath}";
+            await _emailService.SendDeviceVerificationAsync(user.Email!, user.UserName!, code, verificationUrl);
+            
             return Ok(new
             {
                 RequireVerification = true,
@@ -118,8 +152,15 @@ public class AccountController : ControllerBase
         // Email verification check
         if (!user.EmailConfirmed)
         {
-            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            // TO BE IMPLEMENTED: Email send logic for email verification
+            // Generate email verification code
+            var emailVerificationExpiration = int.Parse(_config["App:VerificationCodeExpiration:EmailVerificationMinutes"]);
+            var code = await CreateAndStoreVerificationCodeAsync(user.Id, "EmailVerification", emailVerificationExpiration);
+            // Send email verification
+            var baseUrl = _config["App:BaseUrl"];
+            var verificationPath = _config["App:EmailVerificationPath"];
+            var verificationUrl = $"{baseUrl}{verificationPath}";
+            await _emailService.SendEmailConfirmationAsync(user.Email!, user.UserName!, code, verificationUrl);
+            
             return Ok(new
             {
                 RequireVerification = true,
@@ -217,6 +258,309 @@ public class AccountController : ControllerBase
         });
     }
     
+    [HttpPost("verify-email")]
+    public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailDTO dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await _userManager.FindByEmailAsync(dto.Email);
+        if (user == null)
+        {
+            return BadRequest("Invalid email or code");
+        }
+
+        if (user.EmailConfirmed)
+        {
+            return Ok(new { Message = "Email is already verified" });
+        }
+        
+        var verificationCode = await VerifyCodeAsync(user.Id, dto.Code, "EmailVerification");
+        if (verificationCode != null)
+        {
+            // Confirm email directly
+            user.EmailConfirmed = true;
+            var result = await _userManager.UpdateAsync(user);
+            
+            if (result.Succeeded)
+            {
+                // Also verify the device if it exists and isn't verified yet
+                // This handles the case where user registered and is verifying from the same device
+                var deviceIdentifier = GetOrCreateDeviceId();
+                var device = await _deviceService.GetOrCreateDeviceAsync(user.Id, deviceIdentifier);
+                
+                if (device != null && !device.IsVerified)
+                {
+                    device.IsVerified = true;
+                    device.VerifiedAt = DateTime.UtcNow;
+                    await _dbContext.SaveChangesAsync();
+                }
+                
+                return Ok(new { Message = "Email verified successfully" });
+            }
+            
+            return StatusCode(500, "Failed to confirm email");
+        }
+
+        return BadRequest("Invalid or expired code");
+    }
+
+    [HttpPost("resend-verification")]
+    public async Task<IActionResult> ResendVerification([FromBody] ForgotPasswordDTO dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await _userManager.FindByEmailAsync(dto.Email);
+        if (user == null)
+        {
+            // Don't reveal if email exists for security
+            return Ok(new { Message = "If the email exists, a verification email has been sent." });
+        }
+
+        if (user.EmailConfirmed)
+        {
+            return Ok(new { Message = "Email is already verified" });
+        }
+
+        // Generate new verification code
+        var emailVerificationExpiration = int.Parse(_config["App:VerificationCodeExpiration:EmailVerificationMinutes"]);
+        var code = await CreateAndStoreVerificationCodeAsync(user.Id, "EmailVerification", emailVerificationExpiration);
+        var baseUrl = _config["App:BaseUrl"];
+        var verificationPath = _config["App:EmailVerificationPath"];
+        var verificationUrl = $"{baseUrl}{verificationPath}";
+        await _emailService.SendEmailConfirmationAsync(user.Email!, user.UserName!, code, verificationUrl);
+
+        return Ok(new { Message = "If the email exists, a verification email has been sent." });
+    }
+
+    [HttpPost("verify-device")]
+    public async Task<IActionResult> VerifyDevice([FromBody] VerifyDeviceDTO dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var deviceIdentifier = GetOrCreateDeviceId();
+        var refreshTokenValue = Request.Cookies["refreshToken"];
+        
+        // Try to find user from refresh token first, or from device
+        User? user = null;
+        UserDevice? device = null;
+
+        if (!string.IsNullOrEmpty(refreshTokenValue))
+        {
+            var refreshToken = await _dbContext.RefreshTokens
+                .Include(r => r.UserDevice)
+                .ThenInclude(d => d.User)
+                .FirstOrDefaultAsync(r => r.Token == refreshTokenValue && !r.Revoked);
+            
+            if (refreshToken != null)
+            {
+                user = refreshToken.UserDevice.User;
+                device = await _dbContext.UserDevices
+                    .FirstOrDefaultAsync(d => d.UserId == user!.Id && d.DeviceIdentifier == deviceIdentifier);
+            }
+        }
+
+        // If no user found from refresh token, try to find by device identifier
+        if (user == null)
+        {
+            device = await _dbContext.UserDevices
+                .Include(d => d.User)
+                .FirstOrDefaultAsync(d => d.DeviceIdentifier == deviceIdentifier);
+            
+            if (device != null)
+            {
+                user = device.User;
+            }
+        }
+
+        if (user == null || device == null)
+        {
+            return BadRequest("Device not found. Please log in again.");
+        }
+
+        if (device.IsVerified)
+        {
+            return Ok(new { Message = "Device is already verified" });
+        }
+
+        var verificationCode = await VerifyCodeAsync(user.Id, dto.Code, "DeviceVerification");
+
+        if (verificationCode == null)
+        {
+            return BadRequest("Invalid or expired verification code");
+        }
+
+        device.IsVerified = true;
+        device.VerifiedAt = DateTime.UtcNow;
+        await _dbContext.SaveChangesAsync();
+
+        // If user is logged in, generate tokens
+        if (!string.IsNullOrEmpty(refreshTokenValue))
+        {
+            var refreshToken = await _dbContext.RefreshTokens
+                .Include(r => r.UserDevice)
+                .ThenInclude(d => d.User)
+                .FirstOrDefaultAsync(r => r.Token == refreshTokenValue && !r.Revoked);
+
+            if (refreshToken != null && refreshToken.UserDevice.IsVerified)
+            {
+                return Ok(new
+                {
+                    Message = "Device verified successfully",
+                    UserName = user.UserName,
+                    Email = user.Email,
+                    Token = _tokenService.CreateToken(user)
+                });
+            }
+        }
+
+        return Ok(new { Message = "Device verified successfully. Please log in again." });
+    }
+
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDTO dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await _userManager.FindByEmailAsync(dto.Email);
+        if (user == null)
+        {
+            // Don't reveal if email exists for security
+            return Ok(new { Message = "If the email exists, a password reset code has been sent." });
+        }
+
+        // Generate password reset code
+        var passwordResetExpiration = int.Parse(_config["App:VerificationCodeExpiration:PasswordResetMinutes"]);
+        var code = await CreateAndStoreVerificationCodeAsync(user.Id, "PasswordReset", passwordResetExpiration);
+        var baseUrl = _config["App:BaseUrl"];
+        var resetPath = _config["App:PasswordResetPath"];
+        var resetUrl = $"{baseUrl}{resetPath}";
+        await _emailService.SendPasswordResetAsync(user.Email!, user.UserName!, code, resetUrl);
+
+        return Ok(new { Message = "If the email exists, a password reset code has been sent." });
+    }
+
+
+    [Authorize]
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDTO dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var userId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+
+        var result = await _userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
+        if (result.Succeeded)
+        {
+            // Revoke all refresh tokens for security
+            var devices = await _dbContext.UserDevices
+                .Where(d => d.UserId == user.Id)
+                .Include(d => d.RefreshTokens)
+                .ToListAsync();
+
+            foreach (var device in devices)
+            {
+                foreach (var token in device.RefreshTokens.Where(t => !t.Revoked))
+                {
+                    token.Revoked = true;
+                }
+            }
+
+            await _dbContext.SaveChangesAsync();
+
+            return Ok(new { Message = "Password changed successfully. Please log in again." });
+        }
+
+        return BadRequest(result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    [Authorize]
+    [HttpDelete("device/{deviceId}")]
+    public async Task<IActionResult> RevokeDeviceAccess(int deviceId)
+    {
+        var userId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        var device = await _dbContext.UserDevices
+            .Include(d => d.RefreshTokens)
+            .FirstOrDefaultAsync(d => d.Id == deviceId && d.UserId == userId);
+
+        if (device == null)
+        {
+            return NotFound("Device not found");
+        }
+
+        // Revoke all refresh tokens for this device
+        foreach (var token in device.RefreshTokens.Where(t => !t.Revoked))
+        {
+            token.Revoked = true;
+        }
+
+        // Optionally delete the device (or just mark tokens as revoked)
+        // _dbContext.UserDevices.Remove(device);
+
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(new { Message = "Device access revoked successfully" });
+    }
+
+    [Authorize]
+    [HttpGet("devices")]
+    public async Task<IActionResult> GetUserDevices()
+    {
+        var userId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        var devices = await _dbContext.UserDevices
+            .Where(d => d.UserId == userId)
+            .Select(d => new
+            {
+                d.Id,
+                d.DeviceIdentifier,
+                d.IsVerified,
+                d.VerifiedAt,
+                d.CreatedAt,
+                ActiveTokens = d.RefreshTokens.Count(t => !t.Revoked && t.ExpiresAt > DateTime.UtcNow)
+            })
+            .ToListAsync();
+
+        return Ok(devices);
+    }
+
+    // --------------------
+    // Helper functions below
+    // --------------------
+
     // Helper function to save refresh token on http cookies
     private void SetRefreshCookie(RefreshToken token)
     {
@@ -225,7 +569,124 @@ public class AccountController : ControllerBase
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.Strict,
-            Expires = token.ExpiresAt
+            Expires = token.ExpiresAt,
+            Path = "/"
+        });
+    }
+    
+    // Helper methods for verification codes
+    private string GenerateVerificationCode()
+    {
+        return RandomNumberGenerator.GetInt32(100000, 999999).ToString();
+    }
+    
+    private string HashCode(string code)
+    {
+        return Convert.ToBase64String(
+            SHA256.HashData(Encoding.UTF8.GetBytes(code))
+        );
+    }
+    
+    private async Task<string> CreateAndStoreVerificationCodeAsync(string userId, string purpose, int expirationMinutes)
+    {
+        // Invalidate any existing codes for this user and purpose
+        var existingCodes = await _dbContext.VerificationCodes
+            .Where(vc => vc.UserId == userId && vc.Purpose == purpose && !vc.IsUsed && vc.ExpiresAt > DateTime.UtcNow)
+            .ToListAsync();
+        
+        foreach (var cd in existingCodes)
+        {
+            cd.IsUsed = true;
+        }
+        
+        // Generate new code
+        var code = GenerateVerificationCode();
+        var codeHash = HashCode(code);
+        
+        var verificationCode = new VerificationCode
+        {
+            UserId = userId,
+            CodeHash = codeHash,
+            Purpose = purpose,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes),
+            IsUsed = false,
+            Attempts = 0,
+        };
+        
+        _dbContext.VerificationCodes.Add(verificationCode);
+        await _dbContext.SaveChangesAsync();
+        
+        return code;
+    }
+    
+    private async Task<VerificationCode?> VerifyCodeAsync(string userId, string code, string purpose)
+    {
+        var codeHash = HashCode(code);
+        
+        var verificationCode = await _dbContext.VerificationCodes
+            .FirstOrDefaultAsync(vc => 
+                vc.UserId == userId && 
+                vc.CodeHash == codeHash && 
+                vc.Purpose == purpose &&
+                !vc.IsUsed &&
+                vc.ExpiresAt > DateTime.UtcNow &&
+                vc.Attempts <= 5);
+        
+        if (verificationCode == null)
+        {
+            // Increment attempts for failed verification (optional: track for security)
+            var userCodes = await _dbContext.VerificationCodes
+                .Where(vc => vc.UserId == userId && vc.Purpose == purpose && !vc.IsUsed && vc.ExpiresAt > DateTime.UtcNow)
+                .ToListAsync();
+            
+            foreach (var vc in userCodes)
+            {
+                vc.Attempts++;
+            }
+            
+            if (userCodes.Any())
+            {
+                await _dbContext.SaveChangesAsync();
+            }
+            
+            return null;
+        }
+        
+        // Mark as used
+        verificationCode.IsUsed = true;
+        await _dbContext.SaveChangesAsync();
+        
+        return verificationCode;
+    }
+
+    // Helper function to get or generate device ID
+    // Best practice: Backend generates device ID and stores in secure cookie
+    // Falls back to header if cookie missing (backward compatibility)
+    // Returns generated device ID and sets cookie if needed
+    private string GetOrCreateDeviceId()
+    {
+        // First, check for device ID in secure cookie (most reliable)
+        var deviceIdFromCookie = Request.Cookies["deviceId"];
+        if (!string.IsNullOrWhiteSpace(deviceIdFromCookie))
+        {
+            return deviceIdFromCookie;
+        }
+        
+        // No valid device ID found, generate a new GUID (backend-controlled)
+        var newDeviceId = Guid.NewGuid().ToString();
+        SetDeviceIdCookie(newDeviceId);
+        return newDeviceId;
+    }
+    
+    // Helper function to set device ID cookie
+    private void SetDeviceIdCookie(string deviceId)
+    {
+        Response.Cookies.Append("deviceId", deviceId, new CookieOptions
+        {
+            HttpOnly = true, // Prevents JavaScript access (security)
+            Secure = true, // HTTPS only in production
+            SameSite = SameSiteMode.Strict, // CSRF protection
+            Path = "/" // Available across all routes
         });
     }
 }

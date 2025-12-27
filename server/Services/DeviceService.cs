@@ -13,21 +13,27 @@ public class DeviceService: IDeviceService
         _dbContext = dbContext;
     }
 
-    public async Task<UserDevice> GetOrCreateDeviceAsync(User user, string deviceIdentifier)
+    public async Task<UserDevice> GetOrCreateDeviceAsync(
+        string userId,
+        string deviceIdentifier)
     {
-        var device = await _dbContext.UserDevices.FirstOrDefaultAsync(x=> x.UserId == user.Id && x.DeviceIdentifier == deviceIdentifier);
-        if (device == null)
+        var device = await _dbContext.UserDevices
+            .FirstOrDefaultAsync(d =>
+                d.UserId == userId &&
+                d.DeviceIdentifier == deviceIdentifier);
+
+        if (device != null)
+            return device;
+
+        device = new UserDevice
         {
-            var newDevice = new UserDevice
-            {
-                IsVerified = false,
-                DeviceIdentifier = deviceIdentifier,
-                UserId = user.Id,
-            };
-            await _dbContext.UserDevices.AddAsync(newDevice);
-            await _dbContext.SaveChangesAsync();
-            return newDevice;
-        }
+            UserId = userId,                 
+            DeviceIdentifier = deviceIdentifier,
+            IsVerified = false,
+        };
+
+        _dbContext.UserDevices.Add(device);
         return device;
     }
+
 }

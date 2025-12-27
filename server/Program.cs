@@ -9,6 +9,7 @@ using server.Interfaces;
 using server.Models;
 using server.Services;
 using System.Text;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -140,6 +141,7 @@ builder.Services.AddSwaggerGen(option =>
 // --------------------
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 var app = builder.Build();
 

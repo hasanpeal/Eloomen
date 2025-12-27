@@ -13,6 +13,7 @@ public class ApplicationDBContext : IdentityDbContext<User>
 
     public DbSet<UserDevice> UserDevices { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<VerificationCode> VerificationCodes { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -67,6 +68,24 @@ public class ApplicationDBContext : IdentityDbContext<User>
                 .OnDelete(DeleteBehavior.Cascade)
                 .IsRequired();
         });
+
+        // VerificationCodes configuration
+        builder.Entity<VerificationCode>(entity =>
+        {
+            entity.ToTable("VerificationCodes");
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => new { e.UserId, e.Purpose });
+            entity.HasIndex(e => e.ExpiresAt);
+            entity.HasIndex(e => e.CodeHash);
+            
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+        });
+        
+        
     }
 
     // Add DbSet properties for your entities here

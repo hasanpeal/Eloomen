@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using server.Interfaces;
 using server.Models;
@@ -11,11 +12,13 @@ public class TokenService: ITokenService
 {
     private readonly IConfiguration _config;
     private readonly SymmetricSecurityKey _key;
+    private readonly ApplicationDBContext _dbContext;
     
-    public TokenService(IConfiguration configuration)
+    public TokenService(IConfiguration configuration, ApplicationDBContext dbContext)
     {
         _config = configuration;
         _key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(_config["Jwt:SigningKey"]!));
+        _dbContext = dbContext;
     }
 
     public string CreateToken(User user)
@@ -50,5 +53,17 @@ public class TokenService: ITokenService
     public string CreateRefreshToken()
     {
         return Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+    }
+
+    public async void CreateVerificationCode()
+    {
+        var code = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
+
+        var hash = Convert.ToBase64String(
+            SHA256.HashData(Encoding.UTF8.GetBytes(code))
+        );
+
+        
+
     }
 }
