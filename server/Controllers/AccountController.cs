@@ -105,8 +105,9 @@ public class AccountController : ControllerBase
 
         return Ok(new
         {
-            RequireVerification = true,
-            Message = "Check your email for verification."
+            requireVerification = true,
+            verificationType = "Email",
+            message = "Check your email for verification."
         });
     }
 
@@ -159,8 +160,9 @@ public class AccountController : ControllerBase
             
             return Ok(new
             {
-                RequireVerification = true,
-                Message = "New device detected. Check your email and verify."
+                requireVerification = true,
+                verificationType = "Device",
+                message = "New device detected. Check your email and verify."
             });
         }
         // Email verification check
@@ -184,8 +186,9 @@ public class AccountController : ControllerBase
             
             return Ok(new
             {
-                RequireVerification = true,
-                Message = "Email not verified. Check your email and verify."    
+                requireVerification = true,
+                verificationType = "Email",
+                message = "Email not verified. Check your email and verify."    
             });
         }
         // Account lockout check
@@ -194,26 +197,30 @@ public class AccountController : ControllerBase
             return Unauthorized($"Account is locked out. Lockout end: {user.LockoutEnd.Value.ToLocalTime()}");
         }
 
-        var refreshTokenValue = _tokenService.CreateRefreshToken();
-        var refreshToken = new RefreshToken
+        // Only generate refresh token if "Remember Me" is checked
+        if (dto.RememberMe)
         {
-            Token = refreshTokenValue,
-            UserDeviceId = device.Id,
-            ExpiresAt = DateTime.UtcNow.AddDays(int.Parse(_config["Jwt:RefreshTokenDays"])),
-            Revoked = false
-        };
-        
-        _dbContext.RefreshTokens.Add(refreshToken);
-        await _dbContext.SaveChangesAsync();
-        SetRefreshCookie(refreshToken);
+            var refreshTokenValue = _tokenService.CreateRefreshToken();
+            var refreshToken = new RefreshToken
+            {
+                Token = refreshTokenValue,
+                UserDeviceId = device.Id,
+                ExpiresAt = DateTime.UtcNow.AddDays(int.Parse(_config["Jwt:RefreshTokenDays"])),
+                Revoked = false
+            };
+            
+            _dbContext.RefreshTokens.Add(refreshToken);
+            await _dbContext.SaveChangesAsync();
+            SetRefreshCookie(refreshToken);
+        }
         
         return Ok(
             new
             {
-                RequireVerification = false,
-                UserName = user.UserName,
-                Email = user.Email,
-                Token = _tokenService.CreateToken(user)
+                requireVerification = false,
+                userName = user.UserName,
+                email = user.Email,
+                token = _tokenService.CreateToken(user)
             }
         );
     }
@@ -374,42 +381,31 @@ public class AccountController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var deviceIdentifier = GetOrCreateDeviceId();
-        var refreshTokenValue = Request.Cookies["refreshToken"];
-        
-        // Try to find user from refresh token first, or from device
+        // Find user by username or email
         User? user = null;
-        UserDevice? device = null;
-
-        if (!string.IsNullOrEmpty(refreshTokenValue))
-        {
-            var refreshToken = await _dbContext.RefreshTokens
-                .Include(r => r.UserDevice)
-                .ThenInclude(d => d.User)
-                .FirstOrDefaultAsync(r => r.Token == refreshTokenValue && !r.Revoked);
-            
-            if (refreshToken != null)
-            {
-                user = refreshToken.UserDevice.User;
-                device = await _dbContext.UserDevices
-                    .FirstOrDefaultAsync(d => d.UserId == user!.Id && d.DeviceIdentifier == deviceIdentifier);
-            }
-        }
-
-        // If no user found from refresh token, try to find by device identifier
+        
+        // First, try to find by username
+        user = await _userManager.FindByNameAsync(dto.UsernameOrEmail);
+        
+        // If not found by username, try to find by email
         if (user == null)
         {
-            device = await _dbContext.UserDevices
-                .Include(d => d.User)
-                .FirstOrDefaultAsync(d => d.DeviceIdentifier == deviceIdentifier);
-            
-            if (device != null)
-            {
-                user = device.User;
-            }
+            user = await _userManager.FindByEmailAsync(dto.UsernameOrEmail);
         }
 
-        if (user == null || device == null)
+        if (user == null)
+        {
+            return BadRequest("User not found. Please check your username or email.");
+        }
+
+        // Get device identifier
+        var deviceIdentifier = GetOrCreateDeviceId();
+        
+        // Find the device for this user and device identifier
+        var device = await _dbContext.UserDevices
+            .FirstOrDefaultAsync(d => d.UserId == user.Id && d.DeviceIdentifier == deviceIdentifier);
+
+        if (device == null)
         {
             return BadRequest("Device not found. Please log in again.");
         }
@@ -426,31 +422,19 @@ public class AccountController : ControllerBase
             return BadRequest("Invalid or expired verification code");
         }
 
+        // Verify the device
         device.IsVerified = true;
         device.VerifiedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync();
 
-        // If user is logged in, generate tokens
-        if (!string.IsNullOrEmpty(refreshTokenValue))
+        // Generate access token for the user
+        return Ok(new
         {
-            var refreshToken = await _dbContext.RefreshTokens
-                .Include(r => r.UserDevice)
-                .ThenInclude(d => d.User)
-                .FirstOrDefaultAsync(r => r.Token == refreshTokenValue && !r.Revoked);
-
-            if (refreshToken != null && refreshToken.UserDevice.IsVerified)
-            {
-                return Ok(new
-                {
-                    Message = "Device verified successfully",
-                    UserName = user.UserName,
-                    Email = user.Email,
-                    Token = _tokenService.CreateToken(user)
-                });
-            }
-        }
-
-        return Ok(new { Message = "Device verified successfully. Please log in again." });
+            Message = "Device verified successfully",
+            UserName = user.UserName,
+            Email = user.Email,
+            Token = _tokenService.CreateToken(user)
+        });
     }
 
     [HttpPost("forgot-password")]
@@ -486,6 +470,90 @@ public class AccountController : ControllerBase
         return Ok(new { Message = "If the email exists, a password reset code has been sent." });
     }
 
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDTO dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await _userManager.FindByEmailAsync(dto.Email);
+        if (user == null)
+        {
+            return BadRequest("Invalid email or code");
+        }
+
+        // Verify code but don't mark as used yet
+        var codeHash = HashCode(dto.Code);
+        var verificationCode = await _dbContext.VerificationCodes
+            .FirstOrDefaultAsync(vc => 
+                vc.UserId == user.Id && 
+                vc.CodeHash == codeHash && 
+                vc.Purpose == "PasswordReset" &&
+                !vc.IsUsed &&
+                vc.ExpiresAt > DateTime.UtcNow &&
+                vc.Attempts <= 5);
+        
+        if (verificationCode == null)
+        {
+            // Increment attempts for failed verification
+            var userCodes = await _dbContext.VerificationCodes
+                .Where(vc => vc.UserId == user.Id && vc.Purpose == "PasswordReset" && !vc.IsUsed && vc.ExpiresAt > DateTime.UtcNow)
+                .ToListAsync();
+            
+            foreach (var vc in userCodes)
+            {
+                vc.Attempts++;
+            }
+            
+            if (userCodes.Any())
+            {
+                await _dbContext.SaveChangesAsync();
+            }
+            
+            return BadRequest("Invalid or expired verification code");
+        }
+
+        // Reset password directly - validate password BEFORE marking code as used
+        var removeResult = await _userManager.RemovePasswordAsync(user);
+        if (!removeResult.Succeeded)
+        {
+            return BadRequest(removeResult.Errors.Select(e => e.Description).ToArray());
+        }
+
+        var addResult = await _userManager.AddPasswordAsync(user, dto.NewPassword);
+        
+        if (addResult.Succeeded)
+        {
+            // Only mark code as used after successful password reset
+            verificationCode.IsUsed = true;
+            
+            // Update security stamp to sign out all devices
+            await _userManager.UpdateSecurityStampAsync(user);
+            
+            // Revoke all refresh tokens for security
+            var devices = await _dbContext.UserDevices
+                .Where(d => d.UserId == user.Id)
+                .Include(d => d.RefreshTokens)
+                .ToListAsync();
+
+            foreach (var device in devices)
+            {
+                foreach (var tk in device.RefreshTokens.Where(t => !t.Revoked))
+                {
+                    tk.Revoked = true;
+                }
+            }
+
+            await _dbContext.SaveChangesAsync();
+
+            return Ok(new { message = "Password reset successfully. Please log in with your new password." });
+        }
+
+        // Password validation failed - return errors without marking code as used
+        return BadRequest(addResult.Errors.Select(e => e.Description).ToArray());
+    }
 
     [Authorize]
     [HttpPost("change-password")]
@@ -496,7 +564,9 @@ public class AccountController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var userId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        // ASP.NET Core maps JWT claims to XML schema claim types
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
+                     User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
         if (userId == null)
         {
             return Unauthorized();
@@ -540,7 +610,9 @@ public class AccountController : ControllerBase
     [HttpDelete("device/{deviceId}")]
     public async Task<IActionResult> RevokeDeviceAccess(int deviceId)
     {
-        var userId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        // ASP.NET Core maps JWT claims to XML schema claim types
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
+                     User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
         if (userId == null)
         {
             return Unauthorized();
@@ -573,7 +645,9 @@ public class AccountController : ControllerBase
     [HttpGet("devices")]
     public async Task<IActionResult> GetUserDevices()
     {
-        var userId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        // ASP.NET Core maps JWT claims to XML schema claim types
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
+                     User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
         if (userId == null)
         {
             return Unauthorized();
@@ -599,7 +673,9 @@ public class AccountController : ControllerBase
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {
-        var userId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        // ASP.NET Core maps JWT claims to XML schema claim types
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
+                     User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
         if (userId == null)
         {
             return Unauthorized();

@@ -1,16 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
     usernameOrEmail: "",
     password: "",
   });
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const router = useRouter();
+  const { login } = useAuth();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -26,12 +31,44 @@ export default function LoginPage() {
     setIsLoading(true);
     setError("");
 
-    // TODO: Wire up to API endpoint /api/account/login
-    // For now, just prevent default and show loading state
-    setTimeout(() => {
+    try {
+      const result = await login(
+        formData.usernameOrEmail,
+        formData.password,
+        rememberMe
+      );
+
+      if (result.success) {
+        router.push("/dashboard");
+      } else if (result.requiresVerification) {
+        // Use verificationType from backend response
+        if (result.verificationType === "Device") {
+          router.push(
+            `/verify-device?usernameOrEmail=${encodeURIComponent(
+              formData.usernameOrEmail
+            )}`
+          );
+        } else if (result.verificationType === "Email") {
+          router.push(
+            `/verify-email?email=${encodeURIComponent(
+              formData.usernameOrEmail
+            )}`
+          );
+        } else {
+          setError(result.message || "Verification required");
+        }
+      } else {
+        setError(result.message || "Login failed. Please try again.");
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "An error occurred. Please try again.";
+      setError(errorMessage);
+    } finally {
       setIsLoading(false);
-      console.log("Login attempt:", formData);
-    }, 1000);
+    }
   };
 
   return (
@@ -107,7 +144,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
                 >
                   {showPassword ? (
                     <svg
@@ -154,6 +191,8 @@ export default function LoginPage() {
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
                   className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-600 rounded"
                 />
                 <label
@@ -174,7 +213,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-xl font-bold text-lg hover:shadow-2xl transition-all shadow-xl hover:shadow-indigo-500/50 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-xl font-bold text-lg hover:shadow-2xl transition-all shadow-xl hover:shadow-indigo-500/50 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none cursor-pointer"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center">
@@ -197,7 +236,7 @@ export default function LoginPage() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  Signing in...
+                  Signing in
                 </span>
               ) : (
                 "Sign In"

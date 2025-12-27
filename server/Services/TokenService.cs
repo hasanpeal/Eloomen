@@ -23,13 +23,16 @@ public class TokenService: ITokenService
 
     public string CreateToken(User user)
     {
+        // Ensure SecurityStamp is set (Identity should set this, but ensure it's not null)
+        var securityStamp = user.SecurityStamp ?? string.Empty;
+        
         var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email),
-            new Claim(JwtRegisteredClaimNames.GivenName, user.UserName),
+            new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+            new Claim(JwtRegisteredClaimNames.GivenName, user.UserName ?? string.Empty),
             // Revocation support
-            new Claim("security_stamp", user.SecurityStamp)
+            new Claim("security_stamp", securityStamp)
         };
 
         var creds = new SigningCredentials(_key, SecurityAlgorithms.HmacSha512Signature);

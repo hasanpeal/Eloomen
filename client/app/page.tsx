@@ -19,13 +19,13 @@ export default function Home() {
         <div className="flex items-center space-x-4">
           <Link
             href="/login"
-            className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm"
+            className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
           >
             Sign In
           </Link>
           <Link
             href="/signup"
-            className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:shadow-xl transition-all shadow-lg hover:shadow-indigo-500/50 transform hover:-translate-y-0.5"
+            className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:shadow-xl transition-all shadow-lg hover:shadow-indigo-500/50 transform hover:-translate-y-0.5 cursor-pointer"
           >
             Get Started
           </Link>
@@ -56,13 +56,13 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-20">
             <Link
               href="/signup"
-              className="px-8 py-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-xl font-semibold text-lg hover:shadow-2xl transition-all shadow-xl hover:shadow-indigo-500/50 transform hover:-translate-y-1"
+              className="px-8 py-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-xl font-semibold text-lg hover:shadow-2xl transition-all shadow-xl hover:shadow-indigo-500/50 transform hover:-translate-y-1 cursor-pointer"
             >
               Sign Up
             </Link>
             <Link
               href="/login"
-              className="px-8 py-4 bg-slate-800/80 backdrop-blur-sm text-slate-100 rounded-xl font-semibold text-lg border-2 border-slate-700 hover:border-indigo-600 transition-all shadow-lg hover:shadow-xl"
+              className="px-8 py-4 bg-slate-800/80 backdrop-blur-sm text-slate-100 rounded-xl font-semibold text-lg border-2 border-slate-700 hover:border-indigo-600 transition-all shadow-lg hover:shadow-xl cursor-pointer"
             >
               Sign In
             </Link>
