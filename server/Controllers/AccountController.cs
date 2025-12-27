@@ -85,16 +85,23 @@ public class AccountController : ControllerBase
         var code = await CreateAndStoreVerificationCodeAsync(user.Id, "EmailVerification", emailVerificationExpiration);
 
         // Send email
-        var baseUrl = _config["App:BaseUrl"];
-        var verificationPath = _config["App:EmailVerificationPath"];
-        var verificationUrl = $"{baseUrl}{verificationPath}";
+        try
+        {
+            var baseUrl = _config["App:BaseUrl"];
+            var verificationPath = _config["App:EmailVerificationPath"];
+            var verificationUrl = $"{baseUrl}{verificationPath}";
 
-        await _emailService.SendEmailConfirmationAsync(
-            user.Email!,
-            user.UserName!,
-            code,
-            verificationUrl
-        );
+            await _emailService.SendEmailConfirmationAsync(
+                user.Email!,
+                user.UserName!,
+                code,
+                verificationUrl
+            );
+        }
+        catch
+        {
+            return StatusCode(500, "Failed to send email");
+        }
 
         return Ok(new
         {
@@ -138,10 +145,17 @@ public class AccountController : ControllerBase
             var deviceVerificationExpiration = int.Parse(_config["App:VerificationCodeExpiration:DeviceVerificationMinutes"]);
             var code = await CreateAndStoreVerificationCodeAsync(user.Id, "DeviceVerification", deviceVerificationExpiration);
             // Send device verification email
-            var baseUrl = _config["App:BaseUrl"];
-            var verificationPath = _config["App:DeviceVerificationPath"];
-            var verificationUrl = $"{baseUrl}{verificationPath}";
-            await _emailService.SendDeviceVerificationAsync(user.Email!, user.UserName!, code, verificationUrl);
+            try
+            {
+                var baseUrl = _config["App:BaseUrl"];
+                var verificationPath = _config["App:DeviceVerificationPath"];
+                var verificationUrl = $"{baseUrl}{verificationPath}";
+                await _emailService.SendDeviceVerificationAsync(user.Email!, user.UserName!, code, verificationUrl);
+            }
+            catch
+            {
+                return StatusCode(500, "Failed to send email");
+            }
             
             return Ok(new
             {
@@ -156,10 +170,17 @@ public class AccountController : ControllerBase
             var emailVerificationExpiration = int.Parse(_config["App:VerificationCodeExpiration:EmailVerificationMinutes"]);
             var code = await CreateAndStoreVerificationCodeAsync(user.Id, "EmailVerification", emailVerificationExpiration);
             // Send email verification
-            var baseUrl = _config["App:BaseUrl"];
-            var verificationPath = _config["App:EmailVerificationPath"];
-            var verificationUrl = $"{baseUrl}{verificationPath}";
-            await _emailService.SendEmailConfirmationAsync(user.Email!, user.UserName!, code, verificationUrl);
+            try
+            {
+                var baseUrl = _config["App:BaseUrl"];
+                var verificationPath = _config["App:EmailVerificationPath"];
+                var verificationUrl = $"{baseUrl}{verificationPath}";
+                await _emailService.SendEmailConfirmationAsync(user.Email!, user.UserName!, code, verificationUrl);
+            }
+            catch
+            {
+                return StatusCode(500, "Failed to send email");
+            }
             
             return Ok(new
             {
@@ -330,10 +351,17 @@ public class AccountController : ControllerBase
         // Generate new verification code
         var emailVerificationExpiration = int.Parse(_config["App:VerificationCodeExpiration:EmailVerificationMinutes"]);
         var code = await CreateAndStoreVerificationCodeAsync(user.Id, "EmailVerification", emailVerificationExpiration);
-        var baseUrl = _config["App:BaseUrl"];
-        var verificationPath = _config["App:EmailVerificationPath"];
-        var verificationUrl = $"{baseUrl}{verificationPath}";
-        await _emailService.SendEmailConfirmationAsync(user.Email!, user.UserName!, code, verificationUrl);
+        try
+        {
+            var baseUrl = _config["App:BaseUrl"];
+            var verificationPath = _config["App:EmailVerificationPath"];
+            var verificationUrl = $"{baseUrl}{verificationPath}";
+            await _emailService.SendEmailConfirmationAsync(user.Email!, user.UserName!, code, verificationUrl);
+        }
+        catch
+        {
+            return StatusCode(500, "Failed to send email");
+        }
 
         return Ok(new { Message = "If the email exists, a verification email has been sent." });
     }
@@ -443,10 +471,17 @@ public class AccountController : ControllerBase
         // Generate password reset code
         var passwordResetExpiration = int.Parse(_config["App:VerificationCodeExpiration:PasswordResetMinutes"]);
         var code = await CreateAndStoreVerificationCodeAsync(user.Id, "PasswordReset", passwordResetExpiration);
-        var baseUrl = _config["App:BaseUrl"];
-        var resetPath = _config["App:PasswordResetPath"];
-        var resetUrl = $"{baseUrl}{resetPath}";
-        await _emailService.SendPasswordResetAsync(user.Email!, user.UserName!, code, resetUrl);
+        try
+        {
+            var baseUrl = _config["App:BaseUrl"];
+            var resetPath = _config["App:PasswordResetPath"];
+            var resetUrl = $"{baseUrl}{resetPath}";
+            await _emailService.SendPasswordResetAsync(user.Email!, user.UserName!, code, resetUrl);
+        }
+        catch
+        {
+            return StatusCode(500, "Failed to send email");
+        }
 
         return Ok(new { Message = "If the email exists, a password reset code has been sent." });
     }
@@ -476,6 +511,9 @@ public class AccountController : ControllerBase
         var result = await _userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
         if (result.Succeeded)
         {
+            // Update security stamp to sign out all devices
+            await _userManager.UpdateSecurityStampAsync(user);
+            
             // Revoke all refresh tokens for security
             var devices = await _dbContext.UserDevices
                 .Where(d => d.UserId == user.Id)
@@ -555,6 +593,55 @@ public class AccountController : ControllerBase
             .ToListAsync();
 
         return Ok(devices);
+    }
+
+    [Authorize]
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        var userId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        var deviceIdentifier = GetOrCreateDeviceId();
+        var device = await _dbContext.UserDevices
+            .Include(d => d.RefreshTokens)
+            .FirstOrDefaultAsync(d => d.UserId == userId && d.DeviceIdentifier == deviceIdentifier);
+
+        if (device != null)
+        {
+            // Revoke all refresh tokens for this device
+            foreach (var token in device.RefreshTokens.Where(t => !t.Revoked))
+            {
+                token.Revoked = true;
+            }
+
+            // Remove the device
+            _dbContext.UserDevices.Remove(device);
+            await _dbContext.SaveChangesAsync();
+        }
+
+        // Clear refresh token cookie
+        Response.Cookies.Delete("refreshToken", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Path = "/"
+        });
+
+        // Clear device ID cookie
+        Response.Cookies.Delete("deviceId", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Path = "/"
+        });
+
+        return Ok(new { Message = "Logged out successfully" });
     }
 
     // --------------------
