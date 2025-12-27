@@ -17,3 +17,5 @@ obj/
 .env.production.local
 .vscode/
 .idea/
+appsettings.Development.json
+appsettings.Production.json
