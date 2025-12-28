@@ -117,8 +117,26 @@ export default function ResetPasswordPage() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               {error && (
-                <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-xl text-sm">
-                  {error}
+                <div className="bg-red-900/20 border border-red-800 rounded-xl p-4">
+                  {error.includes(",") ? (
+                    <ul className="space-y-1.5">
+                      {error
+                        .split(",")
+                        .map((msg) => msg.trim())
+                        .filter((msg) => msg.length > 0)
+                        .map((msg, index) => (
+                          <li
+                            key={index}
+                            className="text-sm text-red-400 font-medium flex items-start"
+                          >
+                            <span className="mr-2 mt-0.5 flex-shrink-0">•</span>
+                            <span>{msg}</span>
+                          </li>
+                        ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-red-400 font-medium">{error}</p>
+                  )}
                 </div>
               )}
 

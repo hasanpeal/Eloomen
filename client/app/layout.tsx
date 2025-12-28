@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Montserrat } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "./contexts/AuthContext";
+import { Toaster } from "react-hot-toast";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -10,7 +11,7 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Eloomen - Secure your digital life. Share it on your terms.",
+  title: "Eloomen - Control your digital life",
   description:
     "A secure, relationship-based digital vault platform for storing and sharing sensitive data with time-based and conditional access policies.",
 };
@@ -27,6 +28,10 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>{children}</AuthProvider>
+        <Toaster
+          position="top-center"
+          toastOptions={{}}
+        />
       </body>
     </html>
   );

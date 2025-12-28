@@ -46,16 +46,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const checkAuth = async () => {
       const token = apiClient.getAccessToken();
       if (token) {
-        // Try to decode token to get user info (basic implementation)
         try {
-          const payload = JSON.parse(atob(token.split(".")[1]));
+          // Fetch user info from backend
+          const userInfo = await apiClient.getCurrentUser();
           setUser({
-            username: payload.unique_name || payload.sub || "",
-            email: payload.email || "",
+            username: userInfo.username,
+            email: userInfo.email,
           });
         } catch (error) {
-          console.error("Error decoding token:", error);
+          console.error("Error fetching user info:", error);
+          // Token might be invalid, clear it
           await apiClient.logout();
+          setUser(null);
         }
       }
       setIsLoading(false);
@@ -117,19 +119,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshAuth = async () => {
     try {
       await apiClient.refreshToken();
-      // Re-fetch user info if needed
-      const token = apiClient.getAccessToken();
-      if (token) {
-        try {
-          const payload = JSON.parse(atob(token.split(".")[1]));
-          setUser({
-            username: payload.unique_name || payload.sub || "",
-            email: payload.email || "",
-          });
-        } catch (error) {
-          console.error("Error decoding token:", error);
-        }
-      }
+      // Re-fetch user info from backend
+      const userInfo = await apiClient.getCurrentUser();
+      setUser({
+        username: userInfo.username,
+        email: userInfo.email,
+      });
     } catch (error) {
       console.error("Token refresh failed:", error);
       await logout();

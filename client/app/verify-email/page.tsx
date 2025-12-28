@@ -40,9 +40,8 @@ export default function VerifyEmailPage() {
 
       if (response.message) {
         setSuccess(true);
-        setTimeout(() => {
-          router.push("/login");
-        }, 2000);
+        router.push("/login");
+        
       }
     } catch (error) {
       const errorMessage =

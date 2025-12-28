@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { apiClient } from "../lib/api";
 
 export default function SignupPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -46,16 +49,34 @@ export default function SignupPage() {
 
     setIsLoading(true);
 
-    // TODO: Wire up to API endpoint /api/account/register
-    // For now, just prevent default and show loading state
-    setTimeout(() => {
-      setIsLoading(false);
-      console.log("Signup attempt:", {
-        username: formData.username,
-        email: formData.email,
-        password: formData.password,
+    try {
+      const response = await apiClient.register({
+        Username: formData.username,
+        Email: formData.email,
+        Password: formData.password,
       });
-    }, 1000);
+
+      // Check if email verification is required
+      if (
+        response.requireVerification &&
+        response.verificationType === "Email"
+      ) {
+        // Redirect to verify email page with email as query parameter
+        router.push(
+          `/verify-email?email=${encodeURIComponent(formData.email)}`
+        );
+      } else {
+        // If no verification required (shouldn't happen based on backend, but handle it)
+        router.push("/login");
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Registration failed. Please try again.";
+      setError(errorMessage);
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -87,7 +108,25 @@ export default function SignupPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <div className="bg-red-900/20 border border-red-800 rounded-xl p-4">
-                <p className="text-sm text-red-400 font-medium">{error}</p>
+                {error.includes(",") ? (
+                  <ul className="space-y-1.5">
+                    {error
+                      .split(",")
+                      .map((msg) => msg.trim())
+                      .filter((msg) => msg.length > 0)
+                      .map((msg, index) => (
+                        <li
+                          key={index}
+                          className="text-sm text-red-400 font-medium flex items-start"
+                        >
+                          <span className="mr-2 mt-0.5 flex-shrink-0">•</span>
+                          <span>{msg}</span>
+                        </li>
+                      ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-red-400 font-medium">{error}</p>
+                )}
               </div>
             )}
 

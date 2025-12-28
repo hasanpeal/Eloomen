@@ -642,6 +642,32 @@ public class AccountController : ControllerBase
     }
 
     [Authorize]
+    [HttpGet("user")]
+    public async Task<IActionResult> GetCurrentUser()
+    {
+        // ASP.NET Core maps JWT claims to XML schema claim types
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
+                     User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+
+        return Ok(new
+        {
+            username = user.UserName,
+            email = user.Email
+        });
+    }
+
+    [Authorize]
     [HttpGet("devices")]
     public async Task<IActionResult> GetUserDevices()
     {
@@ -694,22 +720,11 @@ public class AccountController : ControllerBase
                 token.Revoked = true;
             }
 
-            // Remove the device
-            _dbContext.UserDevices.Remove(device);
             await _dbContext.SaveChangesAsync();
         }
 
         // Clear refresh token cookie
         Response.Cookies.Delete("refreshToken", new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Path = "/"
-        });
-
-        // Clear device ID cookie
-        Response.Cookies.Delete("deviceId", new CookieOptions
         {
             HttpOnly = true,
             Secure = true,

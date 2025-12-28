@@ -64,6 +64,7 @@ builder.Services.AddAuthentication(options =>
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateIssuerSigningKey = true,
+            ValidateLifetime = true, // IMPORTANT: Enforce token expiration
 
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
@@ -113,7 +114,7 @@ builder.Services.AddAuthentication(options =>
                     .FindFirstValue(JwtRegisteredClaimNames.Sub) ??
                     context.Principal?
                     .FindFirstValue("sub");
-
+                
                 var tokenStamp = context.Principal?
                     .FindFirst("security_stamp")?.Value;
 

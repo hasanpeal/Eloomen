@@ -1,3 +1,5 @@
+import toast from "react-hot-toast";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export interface LoginResponse {
@@ -31,9 +33,13 @@ export interface RegisterResponse {
 }
 
 class ApiClient {
+  private isRefreshing = false;
+  private refreshPromise: Promise<string | null> | null = null;
+
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retry = true
   ): Promise<T> {
     const token = this.getToken();
     const headers: HeadersInit = {
@@ -53,6 +59,48 @@ class ApiClient {
       });
 
       if (!response.ok) {
+        // Handle 401 Unauthorized - try to refresh token
+        // Don't retry if this is the refresh endpoint itself or auth endpoints
+        const isRefreshEndpoint = endpoint === "/account/refresh";
+        const isAuthEndpoint =
+          endpoint === "/account/login" ||
+          endpoint === "/account/register" ||
+          endpoint === "/account/verify-email" ||
+          endpoint === "/account/verify-device" ||
+          endpoint === "/account/logout";
+
+        if (
+          response.status === 401 &&
+          retry &&
+          token &&
+          !isRefreshEndpoint &&
+          !isAuthEndpoint
+        ) {
+          try {
+            // Attempt to refresh the token
+            const newToken = await this.refreshTokenIfNeeded();
+            if (newToken) {
+              // Retry the original request with the new token
+              return this.request<T>(endpoint, options, false);
+            }
+            // No valid refresh token - clear token and show toast
+            this.removeToken();
+            toast.error("Session expired. Please log in again.");
+            throw new Error("Session expired. Please log in again.");
+          } catch (error) {
+            // Refresh failed - clear token and show toast
+            this.removeToken();
+            // Only show toast if it's not already our session expired error
+            if (
+              !(error instanceof Error) ||
+              error.message !== "Session expired. Please log in again."
+            ) {
+              toast.error("Session expired. Please log in again.");
+            }
+            throw new Error("Session expired. Please log in again.");
+          }
+        }
+
         // Try to parse as JSON first
         const contentType = response.headers.get("content-type");
         let errorMessage = `HTTP error! status: ${response.status}`;
@@ -114,6 +162,44 @@ class ApiClient {
       }
       throw error;
     }
+  }
+
+  private async refreshTokenIfNeeded(): Promise<string | null> {
+    // If already refreshing, wait for the existing refresh to complete
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    // Start a new refresh
+    this.isRefreshing = true;
+    this.refreshPromise = (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/account/refresh`, {
+          method: "POST",
+          credentials: "include", // Important for refresh token cookie
+        });
+
+        if (!response.ok) {
+          // No valid refresh token - return null
+          return null;
+        }
+
+        const data = await response.json();
+        if (data.token) {
+          this.setToken(data.token);
+          return data.token;
+        }
+        return null;
+      } catch {
+        // Network error or invalid response - no valid refresh token
+        return null;
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 
   private getToken(): string | null {
@@ -210,15 +296,14 @@ class ApiClient {
   }
 
   async refreshToken(): Promise<{ token: string }> {
-    const response = await this.request<{ token: string }>("/account/refresh", {
-      method: "POST",
-    });
-
-    if (response.token) {
-      this.setToken(response.token);
+    // Use the internal refresh method which handles the refresh token cookie
+    const newToken = await this.refreshTokenIfNeeded();
+    if (newToken) {
+      return { token: newToken };
     }
-
-    return response;
+    throw new Error(
+      "Failed to refresh token. No valid refresh token available."
+    );
   }
 
   async logout(): Promise<void> {
@@ -226,8 +311,8 @@ class ApiClient {
       await this.request("/account/logout", {
         method: "POST",
       });
-    } catch (error) {
-      console.error("Logout error:", error);
+    } catch {
+      toast.error("Failed to logout. Please try again.");
     } finally {
       this.removeToken();
     }
@@ -256,6 +341,12 @@ class ApiClient {
         Code: code,
         NewPassword: newPassword,
       }),
+    });
+  }
+
+  async getCurrentUser(): Promise<{ username: string; email: string }> {
+    return this.request<{ username: string; email: string }>("/account/user", {
+      method: "GET",
     });
   }
 

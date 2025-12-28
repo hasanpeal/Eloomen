@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../contexts/AuthContext";
+import toast from "react-hot-toast";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -39,6 +40,7 @@ export default function LoginPage() {
       );
 
       if (result.success) {
+        toast.success("Login successful");
         router.push("/dashboard");
       } else if (result.requiresVerification) {
         // Use verificationType from backend response
