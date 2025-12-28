@@ -2,6 +2,14 @@ import toast from "react-hot-toast";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
+// Custom error class for session expiration
+export class SessionExpiredError extends Error {
+  constructor() {
+    super("Session expired. Please log in again.");
+    this.name = "SessionExpiredError";
+  }
+}
+
 export interface LoginResponse {
   requireVerification: boolean;
   verificationType?: "Email" | "Device";
@@ -35,6 +43,7 @@ export interface RegisterResponse {
 class ApiClient {
   private isRefreshing = false;
   private refreshPromise: Promise<string | null> | null = null;
+  private sessionExpiredToastShown = false;
 
   private async request<T>(
     endpoint: string,
@@ -85,19 +94,43 @@ class ApiClient {
             }
             // No valid refresh token - clear token and show toast
             this.removeToken();
-            toast.error("Session expired. Please log in again.");
-            throw new Error("Session expired. Please log in again.");
-          } catch (error) {
+            // Only show toast once
+            if (!this.sessionExpiredToastShown) {
+              this.sessionExpiredToastShown = true;
+              toast.error("Session expired. Please log in again.");
+              // Reset flag after a delay to allow for future session expirations
+              setTimeout(() => {
+                this.sessionExpiredToastShown = false;
+              }, 5000);
+            }
+            // Redirect to login page after showing toast
+            setTimeout(() => {
+              if (typeof window !== "undefined") {
+                window.location.href = "/login";
+              }
+            }, 1500);
+            // Throw special error so callers can handle it
+            throw new SessionExpiredError();
+          } catch {
             // Refresh failed - clear token and show toast
             this.removeToken();
-            // Only show toast if it's not already our session expired error
-            if (
-              !(error instanceof Error) ||
-              error.message !== "Session expired. Please log in again."
-            ) {
+            // Only show toast once
+            if (!this.sessionExpiredToastShown) {
+              this.sessionExpiredToastShown = true;
               toast.error("Session expired. Please log in again.");
+              // Reset flag after a delay to allow for future session expirations
+              setTimeout(() => {
+                this.sessionExpiredToastShown = false;
+              }, 5000);
             }
-            throw new Error("Session expired. Please log in again.");
+            // Redirect to login page after showing toast
+            setTimeout(() => {
+              if (typeof window !== "undefined") {
+                window.location.href = "/login";
+              }
+            }, 1500);
+            // Throw special error so callers can handle it
+            throw new SessionExpiredError();
           }
         }
 
@@ -154,6 +187,10 @@ class ApiClient {
 
       return response.json();
     } catch (error) {
+      // Re-throw SessionExpiredError as-is so callers can handle it
+      if (error instanceof SessionExpiredError) {
+        throw error;
+      }
       // Handle network errors
       if (error instanceof TypeError && error.message.includes("fetch")) {
         throw new Error(
@@ -220,7 +257,8 @@ class ApiClient {
   async login(
     usernameOrEmail: string,
     password: string,
-    rememberMe: boolean = false
+    rememberMe: boolean = false,
+    inviteToken?: string
   ): Promise<LoginResponse> {
     const response = await this.request<LoginResponse>("/account/login", {
       method: "POST",
@@ -228,6 +266,7 @@ class ApiClient {
         UsernameOrEmail: usernameOrEmail,
         Password: password,
         RememberMe: rememberMe,
+        InviteToken: inviteToken,
       }),
     });
 
@@ -238,7 +277,9 @@ class ApiClient {
     return response;
   }
 
-  async register(data: RegisterRequest): Promise<RegisterResponse> {
+  async register(
+    data: RegisterRequest & { inviteToken?: string }
+  ): Promise<RegisterResponse> {
     return this.request<RegisterResponse>("/account/register", {
       method: "POST",
       body: JSON.stringify(data),
@@ -315,6 +356,8 @@ class ApiClient {
       toast.error("Failed to logout. Please try again.");
     } finally {
       this.removeToken();
+      // Reset session expired flag on logout
+      this.sessionExpiredToastShown = false;
     }
   }
 
@@ -353,6 +396,237 @@ class ApiClient {
   isAuthenticated(): boolean {
     return !!this.getAccessToken();
   }
+
+  // Vault API methods
+  async getVaults(): Promise<Vault[]> {
+    return this.request<Vault[]>("/vault", {
+      method: "GET",
+    });
+  }
+
+  async getVault(id: number): Promise<Vault> {
+    return this.request<Vault>(`/vault/${id}`, {
+      method: "GET",
+    });
+  }
+
+  async createVault(data: CreateVaultRequest): Promise<Vault> {
+    return this.request<Vault>("/vault", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateVault(id: number, data: UpdateVaultRequest): Promise<Vault> {
+    return this.request<Vault>(`/vault/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteVault(id: number): Promise<void> {
+    return this.request<void>(`/vault/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async restoreVault(id: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/vault/${id}/restore`, {
+      method: "POST",
+    });
+  }
+
+  // Invite methods
+  async createInvite(
+    vaultId: number,
+    data: CreateInviteRequest
+  ): Promise<VaultInvite> {
+    return this.request<VaultInvite>(`/vault/${vaultId}/invites`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getVaultInvites(vaultId: number): Promise<VaultInvite[]> {
+    return this.request<VaultInvite[]>(`/vault/${vaultId}/invites`, {
+      method: "GET",
+    });
+  }
+
+  async cancelInvite(
+    vaultId: number,
+    inviteId: number
+  ): Promise<{ message: string }> {
+    return this.request<{ message: string }>(
+      `/vault/${vaultId}/invites/${inviteId}/cancel`,
+      {
+        method: "POST",
+      }
+    );
+  }
+
+  async resendInvite(
+    vaultId: number,
+    inviteId: number
+  ): Promise<{ message: string }> {
+    return this.request<{ message: string }>(
+      `/vault/${vaultId}/invites/${inviteId}/resend`,
+      {
+        method: "POST",
+      }
+    );
+  }
+
+  async getInviteInfo(token: string): Promise<InviteInfo> {
+    return this.request<InviteInfo>(
+      `/vault/invites/info?token=${encodeURIComponent(token)}`,
+      {
+        method: "GET",
+      }
+    );
+  }
+
+  async acceptInvite(
+    token: string,
+    email: string
+  ): Promise<{ message: string }> {
+    return this.request<{ message: string }>("/vault/invites/accept", {
+      method: "POST",
+      body: JSON.stringify({ token, email }),
+    });
+  }
+
+  // Member methods
+  async getVaultMembers(vaultId: number): Promise<VaultMember[]> {
+    return this.request<VaultMember[]>(`/vault/${vaultId}/members`, {
+      method: "GET",
+    });
+  }
+
+  async removeMember(vaultId: number, memberId: number): Promise<void> {
+    return this.request<void>(`/vault/${vaultId}/members/${memberId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async updateMemberPrivilege(
+    vaultId: number,
+    data: UpdateMemberPrivilegeRequest
+  ): Promise<{ message: string }> {
+    return this.request<{ message: string }>(
+      `/vault/${vaultId}/members/privilege`,
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async transferOwnership(
+    vaultId: number,
+    data: TransferOwnershipRequest
+  ): Promise<{ message: string }> {
+    return this.request<{ message: string }>(
+      `/vault/${vaultId}/transfer-ownership`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async leaveVault(vaultId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/vault/${vaultId}/leave`, {
+      method: "POST",
+    });
+  }
+}
+
+// Vault Types
+export interface Vault {
+  id: number;
+  ownerId: string;
+  ownerEmail?: string;
+  ownerName?: string;
+  originalOwnerId: string;
+  originalOwnerEmail?: string;
+  originalOwnerName?: string;
+  name: string;
+  description?: string;
+  status: "Active" | "Deleted";
+  createdAt: string;
+  deletedAt?: string;
+  userPrivilege?: "Owner" | "Admin" | "Member";
+}
+
+export interface VaultInvite {
+  id: number;
+  vaultId: number;
+  inviterId: string;
+  inviterEmail?: string;
+  inviteeEmail: string;
+  inviteeId?: string;
+  privilege: "Owner" | "Admin" | "Member";
+  inviteType: "Immediate" | "Delayed";
+  status: "Pending" | "Sent" | "Accepted" | "Cancelled" | "Expired";
+  sentAt?: string;
+  expiresAt?: string;
+  createdAt: string;
+  acceptedAt?: string;
+  note?: string;
+}
+
+export interface VaultMember {
+  id: number;
+  vaultId: number;
+  userId: string;
+  userEmail?: string;
+  userName?: string;
+  privilege: "Owner" | "Admin" | "Member";
+  status: "Active" | "Left" | "Removed";
+  removedById?: string;
+  removedByEmail?: string;
+  removedByName?: string;
+  addedById?: string;
+  addedByEmail?: string;
+  addedByName?: string;
+  joinedAt: string;
+  leftAt?: string;
+  removedAt?: string;
+}
+
+export interface CreateVaultRequest {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateVaultRequest {
+  name: string;
+  description?: string;
+}
+
+export interface CreateInviteRequest {
+  inviteeEmail: string;
+  privilege: "Owner" | "Admin" | "Member";
+  inviteType: "Immediate" | "Delayed";
+  expiresAt?: string;
+  note?: string;
+}
+
+export interface UpdateMemberPrivilegeRequest {
+  memberId: number;
+  privilege: "Owner" | "Admin" | "Member";
+}
+
+export interface TransferOwnershipRequest {
+  memberId: number;
+}
+
+export interface InviteInfo {
+  inviteeEmail: string;
+  isValid: boolean;
+  errorMessage?: string;
+  userExists: boolean;
 }
 
 export const apiClient = new ApiClient();
