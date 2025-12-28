@@ -1,23 +1,41 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../contexts/AuthContext";
 import { apiClient } from "../lib/api";
 import toast from "react-hot-toast";
 
-export default function AcceptInvitePage() {
+function AcceptInviteContent() {
   const { isLoading, isAuthenticated, user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
-  const email = searchParams.get("email");
 
   const [processing, setProcessing] = useState(false);
   const [success, setSuccess] = useState(false);
   const [checkingInvite, setCheckingInvite] = useState(true);
-  const [inviteInfo, setInviteInfo] = useState<{ email: string; userExists: boolean } | null>(null);
+
+  const handleAcceptInvite = async (
+    inviteToken: string,
+    inviteEmail: string
+  ) => {
+    try {
+      setProcessing(true);
+      await apiClient.acceptInvite(inviteToken, inviteEmail);
+      setSuccess(true);
+      toast.success("Invite accepted successfully!");
+      setTimeout(() => {
+        router.push("/vaults");
+      }, 2000);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to accept invite";
+      toast.error(errorMessage);
+      setProcessing(false);
+    }
+  };
 
   useEffect(() => {
     if (!token) {
@@ -30,14 +48,12 @@ export default function AcceptInvitePage() {
       try {
         setCheckingInvite(true);
         const info = await apiClient.getInviteInfo(token);
-        
+
         if (!info.isValid) {
           toast.error(info.errorMessage || "Invalid invite");
           setCheckingInvite(false);
           return;
         }
-
-        setInviteInfo({ email: info.inviteeEmail, userExists: info.userExists });
 
         // If user is authenticated, check if email matches
         if (isAuthenticated && user) {
@@ -45,7 +61,9 @@ export default function AcceptInvitePage() {
             // Email matches, accept invite
             await handleAcceptInvite(token, info.inviteeEmail);
           } else {
-            toast.error("This invite is for a different email address. Please log out and use the correct account.");
+            toast.error(
+              "This invite is for a different email address. Please log out and use the correct account."
+            );
             setCheckingInvite(false);
           }
         } else {
@@ -53,15 +71,25 @@ export default function AcceptInvitePage() {
           setCheckingInvite(false);
           if (info.userExists) {
             // User exists, redirect to login
-            router.push(`/login?email=${encodeURIComponent(info.inviteeEmail)}&token=${encodeURIComponent(token)}`);
+            router.push(
+              `/login?email=${encodeURIComponent(
+                info.inviteeEmail
+              )}&token=${encodeURIComponent(token)}`
+            );
           } else {
             // User doesn't exist, redirect to signup
-            router.push(`/signup?email=${encodeURIComponent(info.inviteeEmail)}&token=${encodeURIComponent(token)}`);
+            router.push(
+              `/signup?email=${encodeURIComponent(
+                info.inviteeEmail
+              )}&token=${encodeURIComponent(token)}`
+            );
           }
         }
-      } catch (error: any) {
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to validate invite";
         console.error("Error checking invite:", error);
-        toast.error("Failed to validate invite");
+        toast.error(errorMessage);
         setCheckingInvite(false);
       }
     };
@@ -69,22 +97,8 @@ export default function AcceptInvitePage() {
     if (!isLoading) {
       checkInvite();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, isAuthenticated, token, user, router]);
-
-  const handleAcceptInvite = async (inviteToken: string, inviteEmail: string) => {
-    try {
-      setProcessing(true);
-      await apiClient.acceptInvite(inviteToken, inviteEmail);
-      setSuccess(true);
-      toast.success("Invite accepted successfully!");
-      setTimeout(() => {
-        router.push("/vaults");
-      }, 2000);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to accept invite");
-      setProcessing(false);
-    }
-  };
 
   if (isLoading || checkingInvite || processing) {
     return (
@@ -138,7 +152,8 @@ export default function AcceptInvitePage() {
             Invite Accepted!
           </h1>
           <p className="text-slate-400 mb-6">
-            You've successfully joined the vault. Redirecting to your vaults...
+            You&apos;ve successfully joined the vault. Redirecting to your
+            vaults...
           </p>
           <Link
             href="/vaults"
@@ -173,4 +188,38 @@ export default function AcceptInvitePage() {
   }
 
   return null;
+}
+
+export default function AcceptInvitePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50 flex items-center justify-center">
+          <div className="text-center">
+            <svg
+              className="animate-spin h-12 w-12 text-indigo-400 mx-auto"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          </div>
+        </div>
+      }
+    >
+      <AcceptInviteContent />
+    </Suspense>
+  );
 }
