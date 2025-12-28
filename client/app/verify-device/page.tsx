@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
+import toast from "react-hot-toast";
 
 function VerifyDeviceContent() {
   const [code, setCode] = useState("");
@@ -45,6 +46,7 @@ function VerifyDeviceContent() {
           email: response.email,
         });
         setSuccess(true);
+        toast.success("Device verified successfully.");
         router.push("/dashboard");
       } else {
         setError(response.message || "Verification failed. Please try again.");

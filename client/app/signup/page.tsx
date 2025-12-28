@@ -66,7 +66,6 @@ export default function SignupPage() {
           `/verify-email?email=${encodeURIComponent(formData.email)}`
         );
       } else {
-        // If no verification required (shouldn't happen based on backend, but handle it)
         router.push("/login");
       }
     } catch (error) {

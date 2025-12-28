@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "../lib/api";
+import { toast } from "react-hot-toast";
 
 function VerifyEmailContent() {
   const [code, setCode] = useState("");
@@ -40,6 +41,7 @@ function VerifyEmailContent() {
 
       if (response.message) {
         setSuccess(true);
+        toast.success("Email verified successfully. Log in to continue.");
         router.push("/login");
       }
     } catch (error) {

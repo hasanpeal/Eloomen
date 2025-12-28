@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "../lib/api";
+import toast from "react-hot-toast";
 
 function ResetPasswordContent() {
   const [email, setEmail] = useState("");
@@ -56,6 +57,7 @@ function ResetPasswordContent() {
 
       if (response.message) {
         setSuccess(true);
+        toast.success("Password reset successfully. Log in to continue.");
         router.push("/login");
       }
     } catch (error) {

@@ -728,7 +728,7 @@ public class AccountController : ControllerBase
         {
             HttpOnly = true,
             Secure = true,
-            SameSite = SameSiteMode.Strict,
+            SameSite = SameSiteMode.Lax, // Changed from Strict to Lax for consistency
             Path = "/"
         });
 
@@ -746,7 +746,7 @@ public class AccountController : ControllerBase
         {
             HttpOnly = true,
             Secure = true,
-            SameSite = SameSiteMode.Strict,
+            SameSite = SameSiteMode.Lax, // Changed from Strict to Lax for better cross-origin compatibility
             Expires = token.ExpiresAt,
             Path = "/"
         });
@@ -859,12 +859,16 @@ public class AccountController : ControllerBase
     // Helper function to set device ID cookie
     private void SetDeviceIdCookie(string deviceId)
     {
-        Response.Cookies.Append("deviceId", deviceId, new CookieOptions
+        // Use Lax instead of Strict for better cross-origin compatibility in production
+        // Lax still provides CSRF protection for state-changing requests while allowing cookies in top-level navigations
+        var cookieOptions = new CookieOptions
         {
             HttpOnly = true, // Prevents JavaScript access (security)
-            Secure = true, // HTTPS only in production
-            SameSite = SameSiteMode.Strict, // CSRF protection
-            Path = "/" // Available across all routes
-        });
+            Secure = true, // HTTPS only (required in production)
+            SameSite = SameSiteMode.Lax, // Better compatibility with cross-origin requests
+            Path = "/", // Available across all routes
+        };
+        
+        Response.Cookies.Append("deviceId", deviceId, cookieOptions);
     }
 }
