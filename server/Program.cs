@@ -217,6 +217,24 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 var app = builder.Build();
 
 // --------------------
+// Automatic Database Migrations
+// --------------------
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var dbContext = services.GetRequiredService<ApplicationDBContext>();
+        dbContext.Database.Migrate(); // Automatically applies pending migrations
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "An error occurred while migrating the database.");
+    }
+}
+
+// --------------------
 // Dev-only behavior
 // --------------------
 if (app.Environment.IsDevelopment())
