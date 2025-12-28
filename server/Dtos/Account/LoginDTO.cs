@@ -9,4 +9,5 @@ public class LoginDTO
     [Required]
     public string Password { get; set; } = string.Empty;
     public bool RememberMe { get; set; } = false;
+    public string? InviteToken { get; set; }
 }

@@ -1,0 +1,1136 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
+import { useAuth } from "../../contexts/AuthContext";
+import {
+  apiClient,
+  Vault,
+  VaultMember,
+  VaultInvite,
+  CreateInviteRequest,
+  SessionExpiredError,
+} from "../../lib/api";
+import toast from "react-hot-toast";
+
+type Tab = "overview" | "members" | "invites" | "history" | "about";
+
+export default function VaultDetailPage() {
+  const { isLoading, isAuthenticated } = useAuth();
+  const router = useRouter();
+  const params = useParams();
+  const vaultId = parseInt(params.id as string);
+
+  const [vault, setVault] = useState<Vault | null>(null);
+  const [members, setMembers] = useState<VaultMember[]>([]);
+  const [invites, setInvites] = useState<VaultInvite[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferMember, setTransferMember] = useState<VaultMember | null>(
+    null
+  );
+  const [inviteForm, setInviteForm] = useState<CreateInviteRequest>({
+    inviteeEmail: "",
+    privilege: "Member",
+    inviteType: "Immediate",
+    note: "",
+  });
+  const [editForm, setEditForm] = useState({ name: "", description: "" });
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [isLoading, isAuthenticated, router]);
+
+  const loadVaultData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [vaultData, membersData, invitesData] = await Promise.all([
+        apiClient.getVault(vaultId),
+        apiClient.getVaultMembers(vaultId),
+        apiClient.getVaultInvites(vaultId),
+      ]);
+      setVault(vaultData);
+      setMembers(membersData || []);
+      setInvites(invitesData || []);
+      setEditForm({
+        name: vaultData.name,
+        description: vaultData.description || "",
+      });
+      // Debug logging
+      console.log("Vault members loaded:", membersData);
+      console.log("Vault userPrivilege:", vaultData.userPrivilege);
+      console.log(
+        "Active members:",
+        membersData?.filter((m) => m.status === "Active")
+      );
+    } catch (error) {
+      // Don't show toast for session expiration - it's already handled in API client
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to load vault data";
+      console.error("Error loading vault data:", error);
+      toast.error(errorMessage);
+      // Don't redirect on error, just show empty state
+      setMembers([]);
+      setInvites([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [vaultId]);
+
+  useEffect(() => {
+    if (isAuthenticated && vaultId) {
+      loadVaultData();
+    }
+  }, [isAuthenticated, vaultId, loadVaultData]);
+
+  const handleUpdateVault = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vault) return;
+
+    const canEdit =
+      vault.userPrivilege === "Owner" || vault.userPrivilege === "Admin";
+    if (!canEdit) {
+      toast.error("You don't have permission to edit this vault");
+      return;
+    }
+
+    try {
+      const updated = await apiClient.updateVault(vaultId, editForm);
+      setVault(updated);
+      setShowEditModal(false);
+      toast.success("Vault updated successfully");
+    } catch (error) {
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to update vault";
+      toast.error(errorMessage);
+    }
+  };
+
+  const handleCreateInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiClient.createInvite(vaultId, inviteForm);
+      toast.success("Invite sent successfully!");
+      setShowInviteModal(false);
+      setInviteForm({
+        inviteeEmail: "",
+        privilege: "Member",
+        inviteType: "Immediate",
+        note: "",
+      });
+      loadVaultData();
+    } catch (error) {
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to create invite";
+      toast.error(errorMessage);
+    }
+  };
+
+  const handleCancelInvite = async (inviteId: number) => {
+    try {
+      await apiClient.cancelInvite(vaultId, inviteId);
+      toast.success("Invite cancelled");
+      loadVaultData();
+    } catch (error) {
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to cancel invite";
+      toast.error(errorMessage);
+    }
+  };
+
+  const handleResendInvite = async (inviteId: number) => {
+    try {
+      await apiClient.resendInvite(vaultId, inviteId);
+      toast.success("Invite resent successfully");
+      loadVaultData();
+    } catch (error) {
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to resend invite";
+      toast.error(errorMessage);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: number) => {
+    if (!confirm("Are you sure you want to remove this member?")) return;
+    try {
+      await apiClient.removeMember(vaultId, memberId);
+      toast.success("Member removed");
+      loadVaultData();
+    } catch (error) {
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to remove member";
+      toast.error(errorMessage);
+    }
+  };
+
+  const handleUpdatePrivilege = async (
+    memberId: number,
+    newPrivilege: "Owner" | "Admin" | "Member"
+  ) => {
+    if (newPrivilege === "Owner") {
+      // Find the member to show in the modal
+      const member = members.find((m) => m.id === memberId);
+      if (member) {
+        setTransferMember(member);
+        setShowTransferModal(true);
+      }
+    } else {
+      try {
+        await apiClient.updateMemberPrivilege(vaultId, {
+          memberId,
+          privilege: newPrivilege,
+        });
+        toast.success("Privilege updated");
+        loadVaultData();
+      } catch (error) {
+        if (error instanceof SessionExpiredError) {
+          return;
+        }
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to update privilege";
+        toast.error(errorMessage);
+      }
+    }
+  };
+
+  const handleConfirmTransfer = async () => {
+    if (!transferMember) return;
+
+    try {
+      await apiClient.transferOwnership(vaultId, {
+        memberId: transferMember.id,
+      });
+      toast.success("Ownership transferred successfully");
+      setShowTransferModal(false);
+      setTransferMember(null);
+      loadVaultData();
+    } catch (error) {
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to transfer ownership";
+      toast.error(errorMessage);
+    }
+  };
+
+  const handleLeaveVault = async () => {
+    try {
+      await apiClient.leaveVault(vaultId);
+      toast.success("Left vault successfully");
+      router.push("/vaults");
+    } catch (error) {
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to leave vault";
+      toast.error(errorMessage);
+    } finally {
+      setShowLeaveModal(false);
+    }
+  };
+
+  const getPrivilegeBadge = (privilege: string) => {
+    switch (privilege) {
+      case "Owner":
+        return (
+          <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs font-semibold border border-yellow-500/30">
+            👑 Owner
+          </span>
+        );
+      case "Admin":
+        return (
+          <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-semibold border border-blue-500/30">
+            🛠 Admin
+          </span>
+        );
+      case "Member":
+        return (
+          <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold border border-green-500/30">
+            👀 Member
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "Active":
+        return (
+          <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs">
+            Active
+          </span>
+        );
+      case "Pending":
+        return (
+          <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs">
+            Pending
+          </span>
+        );
+      case "Sent":
+        return (
+          <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs">
+            Sent
+          </span>
+        );
+      case "Accepted":
+        return (
+          <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs">
+            Accepted
+          </span>
+        );
+      case "Cancelled":
+        return (
+          <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs">
+            Cancelled
+          </span>
+        );
+      case "Expired":
+        return (
+          <span className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded text-xs">
+            Expired
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  if (isLoading || loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50 flex items-center justify-center">
+        <div className="text-center">
+          <svg
+            className="animate-spin h-12 w-12 text-indigo-400 mx-auto"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          <p className="mt-4 text-slate-400">Loading vault</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!vault || !isAuthenticated) {
+    return null;
+  }
+
+  const canEdit =
+    vault.userPrivilege === "Owner" || vault.userPrivilege === "Admin";
+  const canManageMembers = canEdit;
+  const isOwner = vault.userPrivilege === "Owner";
+  const isAdmin = vault.userPrivilege === "Admin";
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50">
+      {/* Navigation */}
+      <nav className="relative container mx-auto px-6 py-6 flex items-center justify-between z-10 border-b border-slate-800/50">
+        <Link href="/" className="group">
+          <span className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
+            Eloomen
+          </span>
+        </Link>
+        <div className="flex items-center space-x-4">
+          <Link
+            href="/dashboard"
+            className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm"
+          >
+            Back to Vaults
+          </Link>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-6 py-12">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-8">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-4xl font-bold text-slate-100">
+                  {vault.name}
+                </h1>
+                {getPrivilegeBadge(vault.userPrivilege || "")}
+              </div>
+              {vault.description && (
+                <p className="text-slate-400 mt-2">{vault.description}</p>
+              )}
+            </div>
+            {canEdit && (
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="px-4 py-2 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors cursor-pointer"
+              >
+                Edit Vault
+              </button>
+            )}
+          </div>
+
+          {/* Tabs */}
+          <div className="border-b border-slate-700/50 mb-6">
+            <div className="flex space-x-6">
+              {(
+                [
+                  "overview",
+                  "members",
+                  ...(canManageMembers ? ["invites", "history", "about"] : []),
+                ] as Tab[]
+              ).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-3 font-semibold transition-colors border-b-2 cursor-pointer ${
+                    activeTab === tab
+                      ? "border-indigo-500 text-indigo-400"
+                      : "border-transparent text-slate-400 hover:text-slate-300"
+                  }`}
+                >
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tab Content */}
+          {activeTab === "overview" && (
+            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 shadow-xl">
+              <h2 className="text-2xl font-bold text-slate-100 mb-6">
+                Vault Overview
+              </h2>
+              <div
+                className={`grid grid-cols-1 ${
+                  canManageMembers ? "md:grid-cols-3" : "md:grid-cols-2"
+                } gap-6 mb-6`}
+              >
+                <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                  <p className="text-slate-400 text-sm mb-1">Total Members</p>
+                  <p className="text-2xl font-bold text-slate-100">
+                    {members.filter((m) => m.status === "Active").length}
+                  </p>
+                </div>
+                {canManageMembers && (
+                  <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                    <p className="text-slate-400 text-sm mb-1">
+                      Pending Invites
+                    </p>
+                    <p className="text-2xl font-bold text-slate-100">
+                      {
+                        invites.filter(
+                          (i) => i.status === "Pending" || i.status === "Sent"
+                        ).length
+                      }
+                    </p>
+                  </div>
+                )}
+                <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                  <p className="text-slate-400 text-sm mb-1">Created</p>
+                  <p className="text-sm font-semibold text-slate-100">
+                    {new Date(vault.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+              {vault.userPrivilege !== "Owner" && (
+                <div className="mt-6 pt-6 border-t border-slate-700/50">
+                  <button
+                    onClick={() => setShowLeaveModal(true)}
+                    className="px-4 py-2 bg-red-500/20 text-red-400 font-semibold rounded-lg hover:bg-red-500/30 transition-colors border border-red-500/30 cursor-pointer"
+                  >
+                    Leave Vault
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "members" && (
+            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 shadow-xl">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-slate-100">Members</h2>
+                {canManageMembers && (
+                  <button
+                    onClick={() => setShowInviteModal(true)}
+                    className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                  >
+                    + Invite Member
+                  </button>
+                )}
+              </div>
+              <div className="space-y-3">
+                {members.filter((m) => m.status === "Active").length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-slate-400 mb-4">
+                      No active members found
+                    </p>
+                    {canManageMembers && (
+                      <button
+                        onClick={() => setShowInviteModal(true)}
+                        className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                      >
+                        + Invite Your First Member
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  members
+                    .filter((m) => m.status === "Active")
+                    .map((member) => (
+                      <div
+                        key={member.id}
+                        className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <p className="text-slate-100 font-semibold">
+                              {member.userName || member.userEmail || "Unknown"}
+                            </p>
+                            <p className="text-slate-400 text-sm">
+                              {member.userEmail}
+                            </p>
+                          </div>
+                          {getPrivilegeBadge(member.privilege)}
+                        </div>
+                        {canManageMembers && (
+                          <div className="flex items-center gap-2">
+                            {/* Owner can update any member except themselves */}
+                            {isOwner && member.privilege !== "Owner" && (
+                              <select
+                                value={member.privilege}
+                                onChange={(e) =>
+                                  handleUpdatePrivilege(
+                                    member.id,
+                                    e.target.value as
+                                      | "Owner"
+                                      | "Admin"
+                                      | "Member"
+                                  )
+                                }
+                                className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                              >
+                                <option value="Member">Member</option>
+                                <option value="Admin">Admin</option>
+                                <option value="Owner">Owner (Transfer)</option>
+                              </select>
+                            )}
+                            {/* Admin can update Members (promote to Admin) and Admins (demote to Member), but not Owners */}
+                            {isAdmin && member.privilege !== "Owner" && (
+                              <select
+                                value={member.privilege}
+                                onChange={(e) =>
+                                  handleUpdatePrivilege(
+                                    member.id,
+                                    e.target.value as "Admin" | "Member"
+                                  )
+                                }
+                                className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                              >
+                                <option value="Member">Member</option>
+                                <option value="Admin">Admin</option>
+                              </select>
+                            )}
+                            {canManageMembers &&
+                              (member.privilege !== "Owner" ||
+                                (isOwner &&
+                                  member.userId !== vault.ownerId)) && (
+                                <button
+                                  onClick={() => handleRemoveMember(member.id)}
+                                  className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded text-sm hover:bg-red-500/30 transition-colors cursor-pointer"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "invites" && (
+            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 shadow-xl">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-slate-100">Invites</h2>
+                {canManageMembers && (
+                  <button
+                    onClick={() => setShowInviteModal(true)}
+                    className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                  >
+                    + Create Invite
+                  </button>
+                )}
+              </div>
+              <div className="space-y-3">
+                {invites.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-slate-400 mb-4">No invites yet</p>
+                    {canManageMembers && (
+                      <button
+                        onClick={() => setShowInviteModal(true)}
+                        className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                      >
+                        + Create Your First Invite
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  invites.map((invite) => (
+                    <div
+                      key={invite.id}
+                      className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50 flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <p className="text-slate-100 font-semibold">
+                            {invite.inviteeEmail}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            {getPrivilegeBadge(invite.privilege)}
+                            {getStatusBadge(invite.status)}
+                          </div>
+                        </div>
+                      </div>
+                      {canManageMembers &&
+                        (invite.status === "Pending" ||
+                          invite.status === "Sent") && (
+                          <div className="flex items-center gap-2">
+                            {invite.status === "Sent" && (
+                              <button
+                                onClick={() => handleResendInvite(invite.id)}
+                                className="px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded text-sm hover:bg-blue-500/30 transition-colors cursor-pointer"
+                              >
+                                Resend
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleCancelInvite(invite.id)}
+                              className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded text-sm hover:bg-red-500/30 transition-colors cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "history" && (
+            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 shadow-xl">
+              <h2 className="text-2xl font-bold text-slate-100 mb-6">
+                Vault History
+              </h2>
+              <div className="space-y-4">
+                {members.length === 0 ? (
+                  <p className="text-slate-400 text-center py-8">
+                    No history available
+                  </p>
+                ) : (
+                  members
+                    .sort((a, b) => {
+                      // Sort by most recent activity first
+                      const aTime = a.removedAt || a.leftAt || a.joinedAt;
+                      const bTime = b.removedAt || b.leftAt || b.joinedAt;
+                      return (
+                        new Date(bTime).getTime() - new Date(aTime).getTime()
+                      );
+                    })
+                    .map((member) => {
+                      let eventType = "";
+                      let eventTime = "";
+                      let eventBy = "";
+                      let eventColor = "";
+
+                      if (member.status === "Removed" && member.removedAt) {
+                        eventType = "Removed";
+                        eventTime = member.removedAt;
+                        eventBy =
+                          member.removedByName ||
+                          member.removedByEmail ||
+                          "Unknown";
+                        eventColor = "red";
+                      } else if (member.status === "Left" && member.leftAt) {
+                        eventType = "Left";
+                        eventTime = member.leftAt;
+                        eventBy =
+                          member.userName || member.userEmail || "Unknown";
+                        eventColor = "yellow";
+                      } else if (member.status === "Active") {
+                        eventType = "Joined";
+                        eventTime = member.joinedAt;
+                        eventBy =
+                          member.addedByName || member.addedByEmail || "System";
+                        eventColor = "green";
+                      }
+
+                      return (
+                        <div
+                          key={member.id}
+                          className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div
+                                className={`w-3 h-3 rounded-full ${
+                                  eventColor === "green"
+                                    ? "bg-green-500"
+                                    : eventColor === "yellow"
+                                    ? "bg-yellow-500"
+                                    : "bg-red-500"
+                                }`}
+                              />
+                              <div>
+                                <p className="text-slate-100 font-semibold">
+                                  {member.userName ||
+                                    member.userEmail ||
+                                    "Unknown"}
+                                </p>
+                                <p className="text-slate-400 text-sm">
+                                  {eventType === "Joined" && (
+                                    <>
+                                      Joined as{" "}
+                                      {getPrivilegeBadge(member.privilege)} •
+                                      Added by{" "}
+                                      <span className="font-medium">
+                                        {eventBy}
+                                      </span>
+                                    </>
+                                  )}
+                                  {eventType === "Removed" && (
+                                    <>
+                                      Removed from vault • Removed by{" "}
+                                      <span className="font-medium">
+                                        {eventBy}
+                                      </span>
+                                    </>
+                                  )}
+                                  {eventType === "Left" && (
+                                    <>Left the vault voluntarily</>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-slate-300 text-sm font-medium">
+                                {new Date(eventTime).toLocaleDateString()}
+                              </p>
+                              <p className="text-slate-500 text-xs">
+                                {new Date(eventTime).toLocaleTimeString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "about" && (
+            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 shadow-xl">
+              <h2 className="text-2xl font-bold text-slate-100 mb-6">
+                Vault Information
+              </h2>
+              <div className="space-y-6">
+                <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                  <p className="text-slate-400 text-sm mb-1">Vault Name</p>
+                  <p className="text-slate-100 font-semibold text-lg">
+                    {vault.name}
+                  </p>
+                </div>
+
+                {vault.description && (
+                  <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                    <p className="text-slate-400 text-sm mb-1">Description</p>
+                    <p className="text-slate-100">{vault.description}</p>
+                  </div>
+                )}
+
+                <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                  <p className="text-slate-400 text-sm mb-1">Current Owner</p>
+                  <p className="text-slate-100 font-semibold">
+                    {vault.ownerName || vault.ownerEmail || "Unknown"}
+                  </p>
+                  {vault.ownerEmail && vault.ownerName && (
+                    <p className="text-slate-400 text-sm mt-1">
+                      {vault.ownerEmail}
+                    </p>
+                  )}
+                </div>
+
+                <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                  <p className="text-slate-400 text-sm mb-1">Original Owner</p>
+                  <p className="text-slate-100 font-semibold">
+                    {vault.originalOwnerName ||
+                      vault.originalOwnerEmail ||
+                      "Unknown"}
+                  </p>
+                  {vault.originalOwnerEmail && vault.originalOwnerName && (
+                    <p className="text-slate-400 text-sm mt-1">
+                      {vault.originalOwnerEmail}
+                    </p>
+                  )}
+                </div>
+
+                <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                  <p className="text-slate-400 text-sm mb-1">Created</p>
+                  <p className="text-slate-100 font-semibold">
+                    {new Date(vault.createdAt).toLocaleDateString()}
+                  </p>
+                  <p className="text-slate-400 text-sm mt-1">
+                    {new Date(vault.createdAt).toLocaleTimeString()}
+                  </p>
+                </div>
+
+                <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                  <p className="text-slate-400 text-sm mb-1">Status</p>
+                  <span
+                    className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                      vault.status === "Active"
+                        ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                        : "bg-red-500/20 text-red-400 border border-red-500/30"
+                    }`}
+                  >
+                    {vault.status}
+                  </span>
+                </div>
+
+                {vault.deletedAt && (
+                  <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                    <p className="text-slate-400 text-sm mb-1">Deleted</p>
+                    <p className="text-slate-100 font-semibold">
+                      {new Date(vault.deletedAt).toLocaleDateString()}
+                    </p>
+                    <p className="text-slate-400 text-sm mt-1">
+                      {new Date(vault.deletedAt).toLocaleTimeString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Edit Vault Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-2xl p-8 max-w-md w-full border border-slate-700/50 shadow-2xl">
+            <h2 className="text-2xl font-bold text-slate-100 mb-6">
+              Edit Vault
+            </h2>
+            <form onSubmit={handleUpdateVault}>
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                  Vault Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.name}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, name: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, description: e.target.value })
+                  }
+                  rows={3}
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                />
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 px-4 py-3 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Invite Modal */}
+      {showInviteModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-2xl p-8 max-w-md w-full border border-slate-700/50 shadow-2xl">
+            <h2 className="text-2xl font-bold text-slate-100 mb-6">
+              Invite Member
+            </h2>
+            <form onSubmit={handleCreateInvite}>
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={inviteForm.inviteeEmail}
+                  onChange={(e) =>
+                    setInviteForm({
+                      ...inviteForm,
+                      inviteeEmail: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="user@example.com"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                  Privilege *
+                </label>
+                <select
+                  value={inviteForm.privilege}
+                  onChange={(e) =>
+                    setInviteForm({
+                      ...inviteForm,
+                      privilege: e.target.value as "Owner" | "Admin" | "Member",
+                    })
+                  }
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  disabled={!isOwner}
+                >
+                  {isOwner && <option value="Owner">Owner</option>}
+                  <option value="Admin">Admin</option>
+                  <option value="Member">Member</option>
+                </select>
+                {!isOwner && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    Only owners can invite as Owner
+                  </p>
+                )}
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                  Invite Type *
+                </label>
+                <select
+                  value={inviteForm.inviteType}
+                  onChange={(e) =>
+                    setInviteForm({
+                      ...inviteForm,
+                      inviteType: e.target.value as "Immediate" | "Delayed",
+                    })
+                  }
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  <option value="Immediate">Immediate</option>
+                  <option value="Delayed">Delayed</option>
+                </select>
+              </div>
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                  Note (Optional)
+                </label>
+                <textarea
+                  value={inviteForm.note}
+                  onChange={(e) =>
+                    setInviteForm({ ...inviteForm, note: e.target.value })
+                  }
+                  rows={3}
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                  placeholder="Optional message for the invitee..."
+                />
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowInviteModal(false)}
+                  className="flex-1 px-4 py-3 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                >
+                  Send Invite
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Leave Vault Confirmation Modal */}
+      {showLeaveModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-2xl p-8 max-w-md w-full border border-slate-700/50 shadow-2xl">
+            <div className="mb-6">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-500/20 mb-4">
+                <svg
+                  className="h-6 w-6 text-red-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-slate-100 mb-2 text-center">
+                Leave Vault?
+              </h2>
+              <p className="text-slate-400 text-center">
+                Are you sure you want to leave{" "}
+                <span className="font-semibold text-slate-200">
+                  {vault?.name}
+                </span>
+                ? You will lose access to this vault and all its contents.
+              </p>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowLeaveModal(false)}
+                className="flex-1 px-4 py-3 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleLeaveVault}
+                className="flex-1 px-4 py-3 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition-colors cursor-pointer"
+              >
+                Leave Vault
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Ownership Confirmation Modal */}
+      {showTransferModal && transferMember && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-2xl p-8 max-w-md w-full border border-slate-700/50 shadow-2xl">
+            <div className="mb-6">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-500/20 mb-4">
+                <svg
+                  className="h-6 w-6 text-yellow-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-slate-100 mb-2 text-center">
+                Transfer Ownership?
+              </h2>
+              <p className="text-slate-400 text-center mb-4">
+                You are about to transfer ownership of{" "}
+                <span className="font-semibold text-slate-200">
+                  {vault?.name}
+                </span>{" "}
+                to{" "}
+                <span className="font-semibold text-slate-200">
+                  {transferMember.userName ||
+                    transferMember.userEmail ||
+                    "this member"}
+                </span>
+                .
+              </p>
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mt-4">
+                <p className="text-yellow-400 text-sm font-medium">
+                  ⚠️ Important: After transferring ownership, you will become an
+                  Admin and will no longer have full control over this vault.
+                </p>
+              </div>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTransferModal(false);
+                  setTransferMember(null);
+                }}
+                className="flex-1 px-4 py-3 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmTransfer}
+                className="flex-1 px-4 py-3 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition-colors cursor-pointer"
+              >
+                Transfer Ownership
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

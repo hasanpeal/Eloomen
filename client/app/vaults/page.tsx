@@ -7,13 +7,12 @@ import { useAuth } from "../contexts/AuthContext";
 import { apiClient, Vault } from "../lib/api";
 import toast from "react-hot-toast";
 
-export default function DashboardPage() {
-  const { isLoading, isAuthenticated, user, logout } = useAuth();
+export default function VaultsPage() {
+  const { isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const [vaults, setVaults] = useState<Vault[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showAccountModal, setShowAccountModal] = useState(false);
   const [createForm, setCreateForm] = useState({ name: "", description: "" });
 
   useEffect(() => {
@@ -33,10 +32,8 @@ export default function DashboardPage() {
       setLoading(true);
       const data = await apiClient.getVaults();
       setVaults(data);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load vaults";
-      toast.error(errorMessage);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load vaults");
     } finally {
       setLoading(false);
     }
@@ -45,20 +42,27 @@ export default function DashboardPage() {
   const handleCreateVault = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await apiClient.createVault(createForm);
+      const vault = await apiClient.createVault(createForm);
       toast.success("Vault created successfully!");
       setShowCreateModal(false);
       setCreateForm({ name: "", description: "" });
       loadVaults();
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to create vault";
-      toast.error(errorMessage);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create vault");
     }
   };
 
-  const handleLogout = async () => {
-    await logout();
+  const handleDeleteVault = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this vault? It can be restored within 30 days.")) {
+      return;
+    }
+    try {
+      await apiClient.deleteVault(id);
+      toast.success("Vault deleted successfully");
+      loadVaults();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete vault");
+    }
   };
 
   if (isLoading || loading) {
@@ -129,18 +133,12 @@ export default function DashboardPage() {
           </span>
         </Link>
         <div className="flex items-center space-x-4">
-          <button
-            onClick={() => setShowAccountModal(true)}
-            className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
+          <Link
+            href="/dashboard"
+            className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm"
           >
-            Account
-          </button>
-          <button
-            onClick={handleLogout}
-            className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
-          >
-            Logout
-          </button>
+            Dashboard
+          </Link>
         </div>
       </nav>
 
@@ -167,7 +165,7 @@ export default function DashboardPage() {
           {vaults.length === 0 ? (
             <div className="bg-slate-800/60 backdrop-blur-md rounded-3xl p-12 border border-slate-700/50 shadow-2xl text-center">
               <p className="text-slate-400 text-lg mb-6">
-                You don&apos;t have any vaults yet.
+                You don't have any vaults yet.
               </p>
               <button
                 onClick={() => setShowCreateModal(true)}
@@ -240,10 +238,7 @@ export default function DashboardPage() {
                 <textarea
                   value={createForm.description}
                   onChange={(e) =>
-                    setCreateForm({
-                      ...createForm,
-                      description: e.target.value,
-                    })
+                    setCreateForm({ ...createForm, description: e.target.value })
                   }
                   rows={3}
                   className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
@@ -272,44 +267,7 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-
-      {/* Account Information Modal */}
-      {showAccountModal && user && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl p-8 max-w-md w-full border border-slate-700/50 shadow-2xl">
-            <h2 className="text-2xl font-bold text-slate-100 mb-6">
-              Account Information
-            </h2>
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-semibold text-slate-400 mb-2">
-                  Username
-                </label>
-                <p className="text-lg text-slate-100 font-medium">
-                  {user.username}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-400 mb-2">
-                  Email Address
-                </label>
-                <p className="text-lg text-slate-100 font-medium">
-                  {user.email}
-                </p>
-              </div>
-            </div>
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={() => setShowAccountModal(false)}
-                className="w-full px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+

@@ -21,6 +21,10 @@ builder.Services.AddControllers()
     {
         options.SerializerSettings.ReferenceLoopHandling =
             Newtonsoft.Json.ReferenceLoopHandling.Ignore;
+        // Serialize enums as strings instead of numbers
+        options.SerializerSettings.Converters.Add(
+            new Newtonsoft.Json.Converters.StringEnumConverter()
+        );
     });
 
 // --------------------
@@ -213,6 +217,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IVaultService, VaultService>();
 
 var app = builder.Build();
 

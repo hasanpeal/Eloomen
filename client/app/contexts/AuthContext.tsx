@@ -8,7 +8,7 @@ import {
   ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { apiClient } from "../lib/api";
+import { apiClient, SessionExpiredError } from "../lib/api";
 
 interface User {
   username: string;
@@ -22,7 +22,8 @@ interface AuthContextType {
   login: (
     usernameOrEmail: string,
     password: string,
-    rememberMe: boolean
+    rememberMe: boolean,
+    inviteToken?: string
   ) => Promise<{
     success: boolean;
     requiresVerification?: boolean;
@@ -47,18 +48,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = apiClient.getAccessToken();
       if (token) {
         try {
-          // Fetch user info from backend
+          // Fetch user info from backend - this will automatically refresh token if needed
           const userInfo = await apiClient.getCurrentUser();
           setUser({
             username: userInfo.username,
             email: userInfo.email,
           });
         } catch (error) {
-          console.error("Error fetching user info:", error);
-          // Token might be invalid, clear it
-          await apiClient.logout();
-          setUser(null);
+          // If error is SessionExpiredError, user is already null, just set loading to false
+          if (error instanceof SessionExpiredError) {
+            // Session expired - user will be redirected by API client
+            setUser(null);
+          } else if (error instanceof Error) {
+            console.error("Error fetching user info:", error);
+            setUser(null);
+          } else {
+            setUser(null);
+          }
         }
+      } else {
+        setUser(null);
       }
       setIsLoading(false);
     };
@@ -68,13 +77,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (
     usernameOrEmail: string,
     password: string,
-    rememberMe: boolean
+    rememberMe: boolean,
+    inviteToken?: string
   ) => {
     try {
       const response = await apiClient.login(
         usernameOrEmail,
         password,
-        rememberMe
+        rememberMe,
+        inviteToken
       );
 
       if (response.requireVerification) {
