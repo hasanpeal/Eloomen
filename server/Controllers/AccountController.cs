@@ -894,12 +894,14 @@ public class AccountController : ControllerBase
     {
         // Use None to allow cookies in all cross-origin requests (required when frontend and backend are on different domains)
         // Secure = true is required when using SameSite = None
+        // Expires must be set for mobile browsers (especially Safari on iOS) to properly accept SameSite=None cookies
         var cookieOptions = new CookieOptions
         {
             HttpOnly = true, // Prevents JavaScript access (security)
             Secure = true, // HTTPS only (REQUIRED when SameSite = None)
             SameSite = SameSiteMode.None, // Allow all cross-origin requests
             Path = "/", // Available across all routes
+            Expires = DateTimeOffset.UtcNow.AddYears(1) // Long-lived cookie (1 year) - required for mobile browsers with SameSite=None
         };
         
         Response.Cookies.Append("deviceId", deviceId, cookieOptions);
