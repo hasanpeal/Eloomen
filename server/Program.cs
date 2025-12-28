@@ -51,7 +51,12 @@ builder.Services.AddIdentity<User, IdentityRole>(options =>
 // --------------------
 // JWT Authentication
 // --------------------
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
@@ -59,6 +64,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateIssuerSigningKey = true,
+            ValidateLifetime = true, // IMPORTANT: Enforce token expiration
 
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
@@ -68,30 +74,81 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             )
         };
         
+        // Prevent automatic redirects to login page
         options.Events = new JwtBearerEvents
         {
+            OnChallenge = context =>
+            {
+                // Don't challenge for non-authorized endpoints
+                var endpoint = context.HttpContext.GetEndpoint();
+                if (endpoint?.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAuthorizeData>() == null)
+                {
+                    // Not an authorized endpoint, allow request to continue without authentication
+                    context.HandleResponse();
+                    return Task.CompletedTask;
+                }
+                
+                // For authorized endpoints, return 401 instead of redirecting
+                context.HandleResponse();
+                context.Response.StatusCode = 401;
+                context.Response.ContentType = "application/json";
+                return context.Response.WriteAsync("{\"message\":\"Unauthorized\"}");
+            },
             OnTokenValidated = async context =>
             {
+                // Only validate token for authorized endpoints
+                var endpoint = context.HttpContext.GetEndpoint();
+                if (endpoint?.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAuthorizeData>() == null)
+                {
+                    // Not an authorized endpoint, skip token validation
+                    return;
+                }
+
                 var userManager = context.HttpContext.RequestServices
                     .GetRequiredService<UserManager<User>>();
 
+                // Get user ID - ASP.NET Core maps JWT claims to XML schema claim types
                 var userId = context.Principal?
-                    .FindFirstValue(JwtRegisteredClaimNames.Sub);
-
+                    .FindFirstValue(ClaimTypes.NameIdentifier) ??
+                    context.Principal?
+                    .FindFirstValue(JwtRegisteredClaimNames.Sub) ??
+                    context.Principal?
+                    .FindFirstValue("sub");
+                
                 var tokenStamp = context.Principal?
                     .FindFirst("security_stamp")?.Value;
 
-                if (userId == null || tokenStamp == null)
+                if (userId == null)
                 {
-                    context.Fail("Invalid token");
+                    context.Fail("Invalid token: missing user ID");
                     return;
                 }
 
                 var user = await userManager.FindByIdAsync(userId);
-
-                if (user == null || user.SecurityStamp != tokenStamp)
+                if (user == null)
                 {
-                    context.Fail("Token revoked");
+                    context.Fail("Token revoked: user not found");
+                    return;
+                }
+
+                // If SecurityStamp is null in DB, update it and allow the request
+                if (string.IsNullOrEmpty(user.SecurityStamp))
+                {
+                    await userManager.UpdateSecurityStampAsync(user);
+                    return; // Allow the request to proceed
+                }
+
+                // Compare security stamps
+                if (string.IsNullOrEmpty(tokenStamp))
+                {
+                    // Token was created before SecurityStamp was set, allow it
+                    return;
+                }
+
+                if (tokenStamp != user.SecurityStamp)
+                {
+                    context.Fail("Token revoked: security stamp mismatch");
+                    return;
                 }
             }
         };
@@ -137,6 +194,20 @@ builder.Services.AddSwaggerGen(option =>
 });
 
 // --------------------
+// CORS
+// --------------------
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins(builder.Configuration["App:BaseUrl"])
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials(); // Important for cookies (refresh token)
+    });
+});
+
+// --------------------
 // App Services
 // --------------------
 builder.Services.AddScoped<ITokenService, TokenService>();
@@ -161,6 +232,7 @@ if (app.Environment.IsDevelopment())
 // --------------------
 // Middleware pipeline
 // --------------------
+app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
