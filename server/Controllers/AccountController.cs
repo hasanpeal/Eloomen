@@ -727,8 +727,8 @@ public class AccountController : ControllerBase
         Response.Cookies.Delete("refreshToken", new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Lax, // Changed from Strict to Lax for consistency
+            Secure = true, // REQUIRED when SameSite = None
+            SameSite = SameSiteMode.None, // Must match the cookie settings used when setting it
             Path = "/"
         });
 
@@ -745,8 +745,8 @@ public class AccountController : ControllerBase
         Response.Cookies.Append("refreshToken", token.Token, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Lax, // Changed from Strict to Lax for better cross-origin compatibility
+            Secure = true, // REQUIRED when SameSite = None
+            SameSite = SameSiteMode.None, // Allow all cross-origin requests
             Expires = token.ExpiresAt,
             Path = "/"
         });
@@ -859,13 +859,13 @@ public class AccountController : ControllerBase
     // Helper function to set device ID cookie
     private void SetDeviceIdCookie(string deviceId)
     {
-        // Use Lax instead of Strict for better cross-origin compatibility in production
-        // Lax still provides CSRF protection for state-changing requests while allowing cookies in top-level navigations
+        // Use None to allow cookies in all cross-origin requests (required when frontend and backend are on different domains)
+        // Secure = true is required when using SameSite = None
         var cookieOptions = new CookieOptions
         {
             HttpOnly = true, // Prevents JavaScript access (security)
-            Secure = true, // HTTPS only (required in production)
-            SameSite = SameSiteMode.Lax, // Better compatibility with cross-origin requests
+            Secure = true, // HTTPS only (REQUIRED when SameSite = None)
+            SameSite = SameSiteMode.None, // Allow all cross-origin requests
             Path = "/", // Available across all routes
         };
         
