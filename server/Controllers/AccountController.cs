@@ -23,6 +23,7 @@ public class AccountController : ControllerBase
     private readonly IEmailService _emailService;
     private readonly IConfiguration _config;
     private readonly ApplicationDBContext _dbContext;
+    private readonly IVaultService _vaultService;
     
     public AccountController(
         UserManager<User> userManager, 
@@ -31,7 +32,8 @@ public class AccountController : ControllerBase
         IDeviceService deviceService,
         IEmailService emailService,
         IConfiguration config, 
-        ApplicationDBContext dbContext)
+        ApplicationDBContext dbContext,
+        IVaultService vaultService)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -40,6 +42,7 @@ public class AccountController : ControllerBase
         _emailService = emailService;
         _config = config;
         _dbContext = dbContext;
+        _vaultService = vaultService;
     }
 
     [HttpPost("register")]
@@ -84,6 +87,20 @@ public class AccountController : ControllerBase
         var emailVerificationExpiration = int.Parse(_config["App:VerificationCodeExpiration:EmailVerificationMinutes"]);
         var code = await CreateAndStoreVerificationCodeAsync(user.Id, "EmailVerification", emailVerificationExpiration);
 
+        // Accept invite if provided
+        if (!string.IsNullOrEmpty(dto.InviteToken))
+        {
+            try
+            {
+                await _vaultService.AcceptInviteAsync(dto.InviteToken, dto.Email, user.Id);
+            }
+            catch
+            {
+                // Log but don't fail registration if invite acceptance fails
+                // User can accept invite later
+            }
+        }
+
         // Send email
         try
         {
@@ -107,7 +124,8 @@ public class AccountController : ControllerBase
         {
             requireVerification = true,
             verificationType = "Email",
-            message = "Check your email for verification."
+            message = "Check your email for verification.",
+            inviteAccepted = !string.IsNullOrEmpty(dto.InviteToken)
         });
     }
 
@@ -213,6 +231,20 @@ public class AccountController : ControllerBase
             await _dbContext.SaveChangesAsync();
             SetRefreshCookie(refreshToken);
         }
+
+        // Accept invite if provided
+        if (!string.IsNullOrEmpty(dto.InviteToken))
+        {
+            try
+            {
+                await _vaultService.AcceptInviteAsync(dto.InviteToken, user.Email!, user.Id);
+            }
+            catch
+            {
+                // Log but don't fail login if invite acceptance fails
+                // User can accept invite later
+            }
+        }
         
         return Ok(
             new
@@ -220,7 +252,8 @@ public class AccountController : ControllerBase
                 requireVerification = false,
                 userName = user.UserName,
                 email = user.Email,
-                token = _tokenService.CreateToken(user)
+                token = _tokenService.CreateToken(user),
+                inviteAccepted = !string.IsNullOrEmpty(dto.InviteToken)
             }
         );
     }
@@ -861,12 +894,14 @@ public class AccountController : ControllerBase
     {
         // Use None to allow cookies in all cross-origin requests (required when frontend and backend are on different domains)
         // Secure = true is required when using SameSite = None
+        // Expires must be set for mobile browsers (especially Safari on iOS) to properly accept SameSite=None cookies
         var cookieOptions = new CookieOptions
         {
             HttpOnly = true, // Prevents JavaScript access (security)
             Secure = true, // HTTPS only (REQUIRED when SameSite = None)
             SameSite = SameSiteMode.None, // Allow all cross-origin requests
             Path = "/", // Available across all routes
+            Expires = DateTimeOffset.UtcNow.AddYears(1) // Long-lived cookie (1 year) - required for mobile browsers with SameSite=None
         };
         
         Response.Cookies.Append("deviceId", deviceId, cookieOptions);

@@ -1,15 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "../lib/api";
+import { useAuth } from "../contexts/AuthContext";
 
-export default function SignupPage() {
+function SignupContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { isLoading: authLoading, isAuthenticated } = useAuth();
+  const inviteEmail = searchParams.get("email");
+  const inviteToken = searchParams.get("token");
   const [formData, setFormData] = useState({
     username: "",
-    email: "",
+    email: inviteEmail || "",
     password: "",
     confirmPassword: "",
   });
@@ -17,6 +22,42 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Redirect to dashboard if already authenticated (unless there's an invite token)
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && !inviteToken) {
+      router.push("/dashboard");
+    }
+  }, [authLoading, isAuthenticated, inviteToken, router]);
+
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50 flex items-center justify-center">
+        <div className="text-center">
+          <svg
+            className="animate-spin h-12 w-12 text-indigo-400 mx-auto"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+        </div>
+      </div>
+    );
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -54,6 +95,7 @@ export default function SignupPage() {
         Username: formData.username,
         Email: formData.email,
         Password: formData.password,
+        inviteToken: inviteToken || undefined,
       });
 
       // Check if email verification is required
@@ -62,11 +104,23 @@ export default function SignupPage() {
         response.verificationType === "Email"
       ) {
         // Redirect to verify email page with email as query parameter
-        router.push(
-          `/verify-email?email=${encodeURIComponent(formData.email)}`
-        );
+        const redirectUrl = `/verify-email?email=${encodeURIComponent(
+          formData.email
+        )}`;
+        if (inviteToken) {
+          router.push(
+            `${redirectUrl}&inviteToken=${encodeURIComponent(inviteToken)}`
+          );
+        } else {
+          router.push(redirectUrl);
+        }
       } else {
-        router.push("/login");
+        // If invite was accepted, go to vaults, otherwise login
+        if (inviteToken) {
+          router.push("/vaults");
+        } else {
+          router.push("/login");
+        }
       }
     } catch (error) {
       const errorMessage =
@@ -154,6 +208,11 @@ export default function SignupPage() {
                 className="block text-sm font-semibold text-slate-300 mb-2"
               >
                 Email Address
+                {inviteEmail && (
+                  <span className="ml-2 text-xs text-indigo-400">
+                    (from invite)
+                  </span>
+                )}
               </label>
               <input
                 type="email"
@@ -162,9 +221,16 @@ export default function SignupPage() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3.5 bg-slate-900/80 backdrop-blur-sm border border-slate-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-slate-100 font-medium placeholder:text-slate-500"
+                disabled={!!inviteEmail}
+                className="w-full px-4 py-3.5 bg-slate-900/80 backdrop-blur-sm border border-slate-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-slate-100 font-medium placeholder:text-slate-500 disabled:opacity-60 disabled:cursor-not-allowed"
                 placeholder="Enter your email"
               />
+              {inviteEmail && (
+                <p className="mt-1 text-xs text-slate-400">
+                  This email is from your vault invitation and cannot be
+                  changed.
+                </p>
+              )}
             </div>
 
             <div>
@@ -358,7 +424,13 @@ export default function SignupPage() {
             <p className="text-sm text-slate-400">
               Already have an account?{" "}
               <Link
-                href="/login"
+                href={
+                  inviteEmail && inviteToken
+                    ? `/login?email=${encodeURIComponent(
+                        inviteEmail
+                      )}&token=${encodeURIComponent(inviteToken)}`
+                    : "/login"
+                }
                 className="font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
               >
                 Sign in
@@ -388,5 +460,39 @@ export default function SignupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50 flex items-center justify-center">
+          <div className="text-center">
+            <svg
+              className="animate-spin h-12 w-12 text-indigo-400 mx-auto"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          </div>
+        </div>
+      }
+    >
+      <SignupContent />
+    </Suspense>
   );
 }
