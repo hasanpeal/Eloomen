@@ -760,8 +760,8 @@ public class AccountController : ControllerBase
         Response.Cookies.Delete("refreshToken", new CookieOptions
         {
             HttpOnly = true,
-            Secure = true, // REQUIRED when SameSite = None
-            SameSite = SameSiteMode.None, // Must match the cookie settings used when setting it
+            Secure = true, // HTTPS only (recommended for production)
+            SameSite = SameSiteMode.Lax, // Must match the cookie settings used when setting it
             Path = "/"
         });
 
@@ -778,8 +778,8 @@ public class AccountController : ControllerBase
         Response.Cookies.Append("refreshToken", token.Token, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true, // REQUIRED when SameSite = None
-            SameSite = SameSiteMode.None, // Allow all cross-origin requests
+            Secure = true, // HTTPS only (recommended for production)
+            SameSite = SameSiteMode.Lax, // Works for same-site requests (www.eloomen.com <-> api.eloomen.com)
             Expires = token.ExpiresAt,
             Path = "/"
         });
@@ -892,16 +892,15 @@ public class AccountController : ControllerBase
     // Helper function to set device ID cookie
     private void SetDeviceIdCookie(string deviceId)
     {
-        // Use None to allow cookies in all cross-origin requests (required when frontend and backend are on different domains)
-        // Secure = true is required when using SameSite = None
-        // Expires must be set for mobile browsers (especially Safari on iOS) to properly accept SameSite=None cookies
+        // Use Lax for same-site requests (www.eloomen.com <-> api.eloomen.com share the same root domain)
+        // Lax is more secure than None and works fine for subdomains of the same root domain
         var cookieOptions = new CookieOptions
         {
             HttpOnly = true, // Prevents JavaScript access (security)
-            Secure = true, // HTTPS only (REQUIRED when SameSite = None)
-            SameSite = SameSiteMode.None, // Allow all cross-origin requests
+            Secure = true, // HTTPS only (recommended for production)
+            SameSite = SameSiteMode.Lax, // Works for same-site requests (subdomains of eloomen.com)
             Path = "/", // Available across all routes
-            Expires = DateTimeOffset.UtcNow.AddYears(1) // Long-lived cookie (1 year) - required for mobile browsers with SameSite=None
+            Expires = DateTimeOffset.UtcNow.AddYears(1) // Long-lived cookie (1 year)
         };
         
         Response.Cookies.Append("deviceId", deviceId, cookieOptions);
