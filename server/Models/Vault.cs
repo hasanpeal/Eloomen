@@ -36,5 +36,6 @@ public class Vault
     // Navigation properties
     public ICollection<VaultMember> Members { get; set; } = new List<VaultMember>();
     public ICollection<VaultInvite> Invites { get; set; } = new List<VaultInvite>();
+    public ICollection<VaultItem> Items { get; set; } = new List<VaultItem>();
 }
 

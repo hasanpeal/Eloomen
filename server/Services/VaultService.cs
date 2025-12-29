@@ -73,6 +73,7 @@ public class VaultService : IVaultService
     public async Task<List<VaultResponseDTO>> GetUserVaultsAsync(string userId)
     {
         var vaults = await _dbContext.Vaults
+            .Include(v => v.Members)
             .Where(v => v.Status == VaultStatus.Active && 
                        (v.OwnerId == userId || 
                         v.Members.Any(m => m.UserId == userId && m.Status == MemberStatus.Active)))
