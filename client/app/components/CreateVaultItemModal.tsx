@@ -1,0 +1,467 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import {
+  CreateVaultItemRequest,
+  UpdateVaultItemRequest,
+  ItemType,
+  VaultMember,
+  VaultItem,
+} from "../lib/api";
+import toast from "react-hot-toast";
+
+interface CreateVaultItemModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  vaultId: number;
+  members: VaultMember[];
+  onSuccess: () => void;
+  editingItem?: VaultItem;
+}
+
+export default function CreateVaultItemModal({
+  isOpen,
+  onClose,
+  vaultId,
+  members,
+  onSuccess,
+  editingItem,
+}: CreateVaultItemModalProps) {
+  const [itemType, setItemType] = useState<ItemType>(
+    editingItem?.itemType || "Password"
+  );
+  const [title, setTitle] = useState(editingItem?.title || "");
+  const [description, setDescription] = useState(
+    editingItem?.description || ""
+  );
+  const [loading, setLoading] = useState(false);
+
+  // Document fields
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+
+  // Password fields
+  const [username, setUsername] = useState(
+    editingItem?.password?.username || ""
+  );
+  const [password, setPassword] = useState(
+    editingItem?.password?.password || ""
+  );
+  const [websiteUrl, setWebsiteUrl] = useState(
+    editingItem?.password?.websiteUrl || ""
+  );
+  const [passwordNotes, setPasswordNotes] = useState(
+    editingItem?.password?.notes || ""
+  );
+
+  // Note fields
+  const [noteContent, setNoteContent] = useState(
+    editingItem?.note?.content || ""
+  );
+
+  // Link fields
+  const [url, setUrl] = useState(editingItem?.link?.url || "");
+  const [linkNotes, setLinkNotes] = useState(editingItem?.link?.notes || "");
+
+  // CryptoWallet fields
+  const [walletType, setWalletType] = useState(
+    editingItem?.cryptoWallet?.walletType || "SeedPhrase"
+  );
+  const [platformName, setPlatformName] = useState(
+    editingItem?.cryptoWallet?.platformName || ""
+  );
+  const [blockchain, setBlockchain] = useState(
+    editingItem?.cryptoWallet?.blockchain || ""
+  );
+  const [publicAddress, setPublicAddress] = useState(
+    editingItem?.cryptoWallet?.publicAddress || ""
+  );
+  const [secret, setSecret] = useState(
+    editingItem?.cryptoWallet?.secret || ""
+  );
+  const [cryptoNotes, setCryptoNotes] = useState(
+    editingItem?.cryptoWallet?.notes || ""
+  );
+
+  // Reset form when modal opens/closes or editingItem changes
+  useEffect(() => {
+    if (isOpen) {
+      if (editingItem) {
+        setItemType(editingItem.itemType);
+        setTitle(editingItem.title);
+        setDescription(editingItem.description || "");
+        setDocumentFile(null);
+        setUsername(editingItem.password?.username || "");
+        setPassword(editingItem.password?.password || "");
+        setWebsiteUrl(editingItem.password?.websiteUrl || "");
+        setPasswordNotes(editingItem.password?.notes || "");
+        setNoteContent(editingItem.note?.content || "");
+        setUrl(editingItem.link?.url || "");
+        setLinkNotes(editingItem.link?.notes || "");
+        setWalletType(editingItem.cryptoWallet?.walletType || "SeedPhrase");
+        setPlatformName(editingItem.cryptoWallet?.platformName || "");
+        setBlockchain(editingItem.cryptoWallet?.blockchain || "");
+        setPublicAddress(editingItem.cryptoWallet?.publicAddress || "");
+        setSecret(editingItem.cryptoWallet?.secret || "");
+        setCryptoNotes(editingItem.cryptoWallet?.notes || "");
+      } else {
+        // Reset to defaults for new item
+        setItemType("Password");
+        setTitle("");
+        setDescription("");
+        setDocumentFile(null);
+        setUsername("");
+        setPassword("");
+        setWebsiteUrl("");
+        setPasswordNotes("");
+        setNoteContent("");
+        setUrl("");
+        setLinkNotes("");
+        setWalletType("SeedPhrase");
+        setPlatformName("");
+        setBlockchain("");
+        setPublicAddress("");
+        setSecret("");
+        setCryptoNotes("");
+      }
+    }
+  }, [isOpen, editingItem]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const { apiClient } = await import("../lib/api");
+      if (editingItem) {
+        const data: UpdateVaultItemRequest = {
+          title: title || undefined,
+          description: description || undefined,
+          documentFile: documentFile || undefined,
+          username: username || undefined,
+          password: password || undefined,
+          websiteUrl: websiteUrl || undefined,
+          passwordNotes: passwordNotes || undefined,
+          noteContent: noteContent || undefined,
+          url: url || undefined,
+          linkNotes: linkNotes || undefined,
+          walletType: walletType as any,
+          platformName: platformName || undefined,
+          blockchain: blockchain || undefined,
+          publicAddress: publicAddress || undefined,
+          secret: secret || undefined,
+          cryptoNotes: cryptoNotes || undefined,
+        };
+        await apiClient.updateVaultItem(vaultId, editingItem.id, data);
+        toast.success("Item updated successfully");
+      } else {
+        const data: CreateVaultItemRequest = {
+        vaultId,
+        itemType,
+        title,
+        description: description || undefined,
+        documentFile: documentFile || undefined,
+        username: username || undefined,
+        password: password || undefined,
+        websiteUrl: websiteUrl || undefined,
+        passwordNotes: passwordNotes || undefined,
+        noteContent: noteContent || undefined,
+        url: url || undefined,
+        linkNotes: linkNotes || undefined,
+        walletType: walletType as any,
+        platformName: platformName || undefined,
+        blockchain: blockchain || undefined,
+        publicAddress: publicAddress || undefined,
+        secret: secret || undefined,
+          cryptoNotes: cryptoNotes || undefined,
+        };
+        await apiClient.createVaultItem(vaultId, data);
+        toast.success("Item created successfully");
+      }
+
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save item");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    setLoading(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 rounded-2xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-slate-700/50 shadow-2xl">
+        <h2 className="text-2xl font-bold text-slate-100 mb-6">
+          {editingItem ? "Edit Item" : "Create New Item"}
+        </h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Item Type
+            </label>
+            <select
+              value={itemType}
+              onChange={(e) => setItemType(e.target.value as ItemType)}
+              className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              disabled={!!editingItem}
+            >
+              <option value="Password">Password</option>
+              <option value="Note">Note</option>
+              <option value="Link">Link</option>
+              <option value="CryptoWallet">Crypto Wallet</option>
+              <option value="Document">Document</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Title <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              required
+              placeholder="Enter item title"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              rows={2}
+              placeholder="Optional description"
+            />
+          </div>
+
+          {itemType === "Document" && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                File
+              </label>
+              <input
+                type="file"
+                onChange={(e) =>
+                  setDocumentFile(e.target.files?.[0] || null)
+                }
+                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-500 file:text-white hover:file:bg-indigo-600"
+                required={!editingItem}
+              />
+            </div>
+          )}
+
+          {itemType === "Password" && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="Enter username"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="Enter password"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Website URL
+                </label>
+                <input
+                  type="url"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="https://example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Notes
+                </label>
+                <textarea
+                  value={passwordNotes}
+                  onChange={(e) => setPasswordNotes(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  rows={3}
+                  placeholder="Optional notes"
+                />
+              </div>
+            </>
+          )}
+
+          {itemType === "Note" && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Content <span className="text-red-400">*</span>
+              </label>
+              <textarea
+                value={noteContent}
+                onChange={(e) => setNoteContent(e.target.value)}
+                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                rows={6}
+                required
+                placeholder="Enter note content"
+              />
+            </div>
+          )}
+
+          {itemType === "Link" && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  URL <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  required
+                  placeholder="https://example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Notes
+                </label>
+                <textarea
+                  value={linkNotes}
+                  onChange={(e) => setLinkNotes(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  rows={3}
+                  placeholder="Optional notes"
+                />
+              </div>
+            </>
+          )}
+
+          {itemType === "CryptoWallet" && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Wallet Type
+                </label>
+                <select
+                  value={walletType}
+                  onChange={(e) => setWalletType(e.target.value as any)}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  <option value="SeedPhrase">Seed Phrase</option>
+                  <option value="PrivateKey">Private Key</option>
+                  <option value="ExchangeLogin">Exchange Login</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Platform Name
+                </label>
+                <input
+                  type="text"
+                  value={platformName}
+                  onChange={(e) => setPlatformName(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="e.g., MetaMask, Coinbase"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Blockchain
+                </label>
+                <input
+                  type="text"
+                  value={blockchain}
+                  onChange={(e) => setBlockchain(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="e.g., Ethereum, Bitcoin"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Public Address
+                </label>
+                <input
+                  type="text"
+                  value={publicAddress}
+                  onChange={(e) => setPublicAddress(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="0x..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Secret (Seed Phrase/Private Key/Credentials){" "}
+                  <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  value={secret}
+                  onChange={(e) => setSecret(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  rows={4}
+                  required
+                  placeholder="Enter seed phrase, private key, or exchange credentials"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Notes
+                </label>
+                <textarea
+                  value={cryptoNotes}
+                  onChange={(e) => setCryptoNotes(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  rows={3}
+                  placeholder="Optional notes"
+                />
+              </div>
+            </>
+          )}
+
+          <div className="flex gap-3 justify-end pt-6 border-t border-slate-700/50">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="px-6 py-2 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "Saving" : editingItem ? "Update" : "Create"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
