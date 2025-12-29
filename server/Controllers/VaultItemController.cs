@@ -74,10 +74,23 @@ public class VaultItemController : ControllerBase
             if (Request.Form.ContainsKey("visibilities"))
             {
                 var visibilitiesJson = Request.Form["visibilities"].ToString();
+                _logger.LogInformation("Received visibilities JSON for vault {VaultId}: {Json}", vaultId, visibilitiesJson);
                 if (!string.IsNullOrEmpty(visibilitiesJson))
                 {
-                    dto.Visibilities = JsonSerializer.Deserialize<List<ItemVisibilityDTO>>(visibilitiesJson);
+                    try
+                    {
+                        dto.Visibilities = JsonSerializer.Deserialize<List<ItemVisibilityDTO>>(visibilitiesJson);
+                        _logger.LogInformation("Deserialized {Count} visibility entries for vault {VaultId}", dto.Visibilities?.Count ?? 0, vaultId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to deserialize visibilities JSON for vault {VaultId}", vaultId);
+                    }
                 }
+            }
+            else
+            {
+                _logger.LogWarning("No visibilities found in form data for vault {VaultId}", vaultId);
             }
 
             if (!ModelState.IsValid)

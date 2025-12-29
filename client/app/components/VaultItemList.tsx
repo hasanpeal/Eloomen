@@ -7,7 +7,6 @@ interface VaultItemListProps {
   onEdit?: (item: VaultItem) => void;
   onDelete?: (item: VaultItem) => void;
   onView?: (item: VaultItem) => void;
-  canEdit?: boolean;
   canView?: boolean;
 }
 
@@ -16,7 +15,6 @@ export default function VaultItemList({
   onEdit,
   onDelete,
   onView,
-  canEdit = false,
   canView = false,
 }: VaultItemListProps) {
   const getItemIcon = (itemType: string) => {
@@ -37,7 +35,8 @@ export default function VaultItemList({
   };
 
   const canUserEdit = (item: VaultItem) => {
-    return item.userPermission === "Edit" || canEdit;
+    // Only allow edit if userPermission is explicitly "Edit"
+    return item.userPermission === "Edit";
   };
 
   const canUserView = (item: VaultItem) => {
@@ -110,7 +109,6 @@ export default function VaultItemList({
               {item.description}
             </p>
           )}
-          
         </div>
       ))}
       {items.length === 0 && (

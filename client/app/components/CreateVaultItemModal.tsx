@@ -7,6 +7,8 @@ import {
   ItemType,
   VaultMember,
   VaultItem,
+  ItemPermission,
+  ItemVisibilityRequest,
 } from "../lib/api";
 import toast from "react-hot-toast";
 
@@ -17,6 +19,7 @@ interface CreateVaultItemModalProps {
   members: VaultMember[];
   onSuccess: () => void;
   editingItem?: VaultItem;
+  currentUserEmail?: string;
 }
 
 export default function CreateVaultItemModal({
@@ -26,6 +29,7 @@ export default function CreateVaultItemModal({
   members,
   onSuccess,
   editingItem,
+  currentUserEmail,
 }: CreateVaultItemModalProps) {
   const [itemType, setItemType] = useState<ItemType>(
     editingItem?.itemType || "Password"
@@ -82,6 +86,11 @@ export default function CreateVaultItemModal({
     editingItem?.cryptoWallet?.notes || ""
   );
 
+  // Visibility settings - map of memberId to permission (only View or Edit)
+  const [visibilities, setVisibilities] = useState<
+    Map<number, ItemPermission>
+  >(new Map());
+
   // Reset form when modal opens/closes or editingItem changes
   useEffect(() => {
     if (isOpen) {
@@ -103,6 +112,23 @@ export default function CreateVaultItemModal({
         setPublicAddress(editingItem.cryptoWallet?.publicAddress || "");
         setSecret(editingItem.cryptoWallet?.secret || "");
         setCryptoNotes(editingItem.cryptoWallet?.notes || "");
+
+        // Load existing visibilities
+        const visibilityMap = new Map<number, ItemPermission>();
+        if (editingItem.visibilities) {
+          editingItem.visibilities.forEach((vis) => {
+            visibilityMap.set(vis.vaultMemberId, vis.permission);
+          });
+        }
+        // Set defaults for members without visibility - creator gets Edit, others get View
+        members.forEach((member) => {
+          if (member.status === "Active" && !visibilityMap.has(member.id)) {
+            const isCreator = currentUserEmail && 
+              (member.userEmail?.toLowerCase() === currentUserEmail.toLowerCase());
+            visibilityMap.set(member.id, isCreator ? "Edit" : "View");
+          }
+        });
+        setVisibilities(visibilityMap);
       } else {
         // Reset to defaults for new item
         setItemType("Password");
@@ -122,9 +148,20 @@ export default function CreateVaultItemModal({
         setPublicAddress("");
         setSecret("");
         setCryptoNotes("");
+        // Initialize visibilities - creator gets Edit, others get View
+        const defaultVisibilities = new Map<number, ItemPermission>();
+        members.forEach((member) => {
+          if (member.status === "Active") {
+            // If this member is the current user (creator), give them Edit permission
+            const isCreator = currentUserEmail && 
+              (member.userEmail?.toLowerCase() === currentUserEmail.toLowerCase());
+            defaultVisibilities.set(member.id, isCreator ? "Edit" : "View");
+          }
+        });
+        setVisibilities(defaultVisibilities);
       }
     }
-  }, [isOpen, editingItem]);
+  }, [isOpen, editingItem, members]);
 
   if (!isOpen) return null;
 
@@ -135,6 +172,15 @@ export default function CreateVaultItemModal({
     try {
       const { apiClient } = await import("../lib/api");
       if (editingItem) {
+        // Build visibilities array for all members
+        const visibilityArray: ItemVisibilityRequest[] = [];
+        visibilities.forEach((permission, memberId) => {
+          visibilityArray.push({
+            vaultMemberId: memberId,
+            permission: permission,
+          });
+        });
+
         const data: UpdateVaultItemRequest = {
           title: title || undefined,
           description: description || undefined,
@@ -152,10 +198,24 @@ export default function CreateVaultItemModal({
           publicAddress: publicAddress || undefined,
           secret: secret || undefined,
           cryptoNotes: cryptoNotes || undefined,
+          visibilities: visibilityArray.length > 0 ? visibilityArray : undefined,
         };
         await apiClient.updateVaultItem(vaultId, editingItem.id, data);
         toast.success("Item updated successfully");
       } else {
+        // Build visibilities array for all members
+        const visibilityArray: ItemVisibilityRequest[] = [];
+        visibilities.forEach((permission, memberId) => {
+          visibilityArray.push({
+            vaultMemberId: memberId,
+            permission: permission,
+          });
+        });
+
+        console.log("Creating item with visibilities:", visibilityArray);
+        console.log("Visibility map size:", visibilities.size);
+        console.log("Members count:", members.filter(m => m.status === "Active").length);
+
         const data: CreateVaultItemRequest = {
         vaultId,
         itemType,
@@ -175,6 +235,7 @@ export default function CreateVaultItemModal({
         publicAddress: publicAddress || undefined,
         secret: secret || undefined,
           cryptoNotes: cryptoNotes || undefined,
+          visibilities: visibilityArray.length > 0 ? visibilityArray : undefined,
         };
         await apiClient.createVaultItem(vaultId, data);
         toast.success("Item created successfully");
@@ -441,6 +502,61 @@ export default function CreateVaultItemModal({
                 />
               </div>
             </>
+          )}
+
+          {/* Member Visibility Configuration - Only show for creator when editing */}
+          {(!editingItem || (editingItem && currentUserEmail && 
+            (() => {
+              const currentMember = members.find(m => 
+                m.userEmail?.toLowerCase() === currentUserEmail.toLowerCase()
+              );
+              return currentMember && currentMember.userId === editingItem.createdByUserId;
+            })())) && (
+          <div className="pt-6 border-t border-slate-700/50">
+            <label className="block text-sm font-medium text-slate-300 mb-3">
+              Member Permissions
+            </label>
+            <p className="text-xs text-slate-400 mb-4">
+              {editingItem ? "Update which members can view or edit this item" : "Configure which members can view or edit this item"}
+            </p>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {members
+                .filter((m) => m.status === "Active")
+                .map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center justify-between bg-slate-900/50 rounded-lg p-3 border border-slate-700/50"
+                  >
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-100">
+                        {member.userName || member.userEmail || "Unknown User"}{" "}
+                        <span className="text-slate-400 font-normal">
+                          ({member.privilege})
+                        </span>
+                      </p>
+                    </div>
+                    <select
+                      value={visibilities.get(member.id) || "View"}
+                      onChange={(e) => {
+                        const newVisibilities = new Map(visibilities);
+                        const value = e.target.value as ItemPermission;
+                        newVisibilities.set(member.id, value);
+                        setVisibilities(newVisibilities);
+                      }}
+                      className="ml-4 bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    >
+                      <option value="View">View</option>
+                      <option value="Edit">Edit</option>
+                    </select>
+                  </div>
+                ))}
+              {members.filter((m) => m.status === "Active").length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4">
+                  No active members in this vault
+                </p>
+              )}
+            </div>
+          </div>
           )}
 
           <div className="flex gap-3 justify-end pt-6 border-t border-slate-700/50">

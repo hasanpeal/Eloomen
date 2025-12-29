@@ -19,10 +19,10 @@ import CreateVaultItemModal from "../../components/CreateVaultItemModal";
 import DeleteItemModal from "../../components/DeleteItemModal";
 import ViewItemModal from "../../components/ViewItemModal";
 
-type Tab = "overview" | "items" | "members" | "invites" | "history" | "about";
+type Tab = "items" | "members" | "invites" | "history" | "about";
 
 export default function VaultDetailPage() {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, user } = useAuth();
   const router = useRouter();
   const params = useParams();
   const vaultId = parseInt(params.id as string);
@@ -429,7 +429,6 @@ export default function VaultDetailPage() {
               {(
                 [
                   "items",
-                  "overview",
                   "members",
                   ...(canManageMembers ? ["invites", "history", "about"] : []),
                 ] as Tab[]
@@ -488,63 +487,8 @@ export default function VaultDetailPage() {
                     toast.error(error.message || "Failed to load item");
                   }
                 }}
-                canEdit={
-                  vault.userPrivilege === "Owner" ||
-                  vault.userPrivilege === "Admin" ||
-                  vault.userPrivilege === "Member"
-                }
                 canView={true}
               />
-            </div>
-          )}
-
-          {activeTab === "overview" && (
-            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 shadow-xl">
-              <h2 className="text-2xl font-bold text-slate-100 mb-6">
-                Vault Overview
-              </h2>
-              <div
-                className={`grid grid-cols-1 ${
-                  canManageMembers ? "md:grid-cols-3" : "md:grid-cols-2"
-                } gap-6 mb-6`}
-              >
-                <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
-                  <p className="text-slate-400 text-sm mb-1">Total Members</p>
-                  <p className="text-2xl font-bold text-slate-100">
-                    {members.filter((m) => m.status === "Active").length}
-                  </p>
-                </div>
-                {canManageMembers && (
-                  <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
-                    <p className="text-slate-400 text-sm mb-1">
-                      Pending Invites
-                    </p>
-                    <p className="text-2xl font-bold text-slate-100">
-                      {
-                        invites.filter(
-                          (i) => i.status === "Pending" || i.status === "Sent"
-                        ).length
-                      }
-                    </p>
-                  </div>
-                )}
-                <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
-                  <p className="text-slate-400 text-sm mb-1">Created</p>
-                  <p className="text-sm font-semibold text-slate-100">
-                    {new Date(vault.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              {vault.userPrivilege !== "Owner" && (
-                <div className="mt-6 pt-6 border-t border-slate-700/50">
-                  <button
-                    onClick={() => setShowLeaveModal(true)}
-                    className="px-4 py-2 bg-red-500/20 text-red-400 font-semibold rounded-lg hover:bg-red-500/30 transition-colors border border-red-500/30 cursor-pointer"
-                  >
-                    Leave Vault
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
@@ -1207,6 +1151,7 @@ export default function VaultDetailPage() {
         members={members.filter((m) => m.status === "Active")}
         onSuccess={loadVaultData}
         editingItem={editingItem}
+        currentUserEmail={user?.email}
       />
 
       {/* Delete Item Modal */}

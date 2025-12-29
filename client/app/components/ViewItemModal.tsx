@@ -289,6 +289,12 @@ export default function ViewItemModal({
               <label className="text-slate-400">Last Updated</label>
               <p className="text-slate-100">{new Date(displayItem.updatedAt).toLocaleString()}</p>
             </div>
+            {displayItem.createdByUserName && (
+              <div>
+                <label className="text-slate-400">Created By</label>
+                <p className="text-slate-100">{displayItem.createdByUserName}</p>
+              </div>
+            )}
             {displayItem.userPermission && (
               <div>
                 <label className="text-slate-400">Your Permission</label>
@@ -306,16 +312,27 @@ export default function ViewItemModal({
           >
             Close
           </button>
-          {canEdit && displayItem.userPermission === "Edit" && (
-            <button
-              onClick={() => {
-                onClose();
-                onDelete?.();
-              }}
-              className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Delete
-            </button>
+          {displayItem.userPermission === "Edit" && (
+            <>
+              <button
+                onClick={() => {
+                  onClose();
+                  onEdit?.();
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => {
+                  onClose();
+                  onDelete?.();
+                }}
+                className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </>
           )}
         </div>
       </div>

@@ -141,14 +141,20 @@ public class VaultItemService : IVaultItemService
                 break;
         }
 
-        // Set visibility permissions
+        // Set visibility permissions - ALWAYS create for all members
+        _logger.LogInformation("Setting visibilities for item {ItemId} in vault {VaultId}. Provided visibilities: {Count}", 
+            item.Id, dto.VaultId, dto.Visibilities?.Count ?? 0);
+        
         if (dto.Visibilities != null && dto.Visibilities.Any())
         {
-            await SetItemVisibilitiesAsync(item.Id, dto.Visibilities, userId);
+            _logger.LogInformation("Using provided visibilities for item {ItemId}", item.Id);
+            // Ensure all members have visibility records
+            await SetItemVisibilitiesAsync(item.Id, dto.Visibilities, dto.VaultId, userId);
         }
         else
         {
-            // Default: make visible to all vault members
+            _logger.LogInformation("Using default visibilities for item {ItemId}", item.Id);
+            // Default: make visible to all vault members (creator gets Edit, others get View)
             await SetDefaultVisibilitiesAsync(item.Id, dto.VaultId, userId);
         }
 
@@ -170,7 +176,7 @@ public class VaultItemService : IVaultItemService
         if (item == null || item.Status == ItemStatus.Deleted)
             return null;
 
-        // Check if user can edit
+        // Check if user can edit - must have Edit permission in VaultItemVisibility
         var permission = await GetUserPermissionAsync(itemId, userId);
         if (permission != ItemPermission.Edit)
             throw new UnauthorizedAccessException("You don't have permission to edit this item");
@@ -204,10 +210,10 @@ public class VaultItemService : IVaultItemService
                 break;
         }
 
-        // Update visibility if provided
-        if (dto.Visibilities != null)
+        // Update visibility if provided - only creator can update permissions
+        if (dto.Visibilities != null && item.CreatedByUserId == userId)
         {
-            await UpdateItemVisibilitiesAsync(itemId, dto.Visibilities, userId);
+            await UpdateItemVisibilitiesAsync(itemId, dto.Visibilities, item.VaultId, userId);
         }
 
         await _dbContext.SaveChangesAsync();
@@ -382,33 +388,61 @@ public class VaultItemService : IVaultItemService
         await Task.CompletedTask;
     }
 
-    private async Task SetItemVisibilitiesAsync(int itemId, List<ItemVisibilityDTO> visibilities, string userId)
+    private async Task SetItemVisibilitiesAsync(int itemId, List<ItemVisibilityDTO> visibilities, int vaultId, string userId)
     {
-        // Remove existing visibilities
+        _logger.LogInformation("SetItemVisibilitiesAsync called for item {ItemId} with {Count} visibility entries", itemId, visibilities?.Count ?? 0);
+        
+        // Remove existing visibilities (shouldn't be any for new items, but safe to do)
         var existing = await _dbContext.VaultItemVisibilities
             .Where(v => v.VaultItemId == itemId)
             .ToListAsync();
-        _dbContext.VaultItemVisibilities.RemoveRange(existing);
-
-        // Add new visibilities
-        foreach (var visibility in visibilities)
+        if (existing.Any())
         {
-            var vaultMember = await _dbContext.VaultMembers
-                .FirstOrDefaultAsync(m => m.Id == visibility.VaultMemberId);
-            
-            if (vaultMember != null)
-            {
-                var itemVisibility = new VaultItemVisibility
-                {
-                    VaultItemId = itemId,
-                    VaultMemberId = visibility.VaultMemberId,
-                    Permission = visibility.Permission
-                };
-                _dbContext.VaultItemVisibilities.Add(itemVisibility);
-            }
+            _dbContext.VaultItemVisibilities.RemoveRange(existing);
+            await _dbContext.SaveChangesAsync();
         }
 
-        await _dbContext.SaveChangesAsync();
+        // Get all active members to ensure everyone has a visibility record
+        var allMembers = await _dbContext.VaultMembers
+            .Where(m => m.VaultId == vaultId && m.Status == MemberStatus.Active)
+            .ToListAsync();
+
+        _logger.LogInformation("Found {Count} active members for vault {VaultId}", allMembers.Count, vaultId);
+
+        // Create a dictionary of provided visibilities for quick lookup
+        // Handle duplicates by taking the last one (in case frontend sends duplicates)
+        var visibilityDict = visibilities != null && visibilities.Any()
+            ? visibilities
+                .GroupBy(v => v.VaultMemberId)
+                .ToDictionary(g => g.Key, g => g.Last().Permission)
+            : new Dictionary<int, ItemPermission>();
+        
+        _logger.LogInformation("Created visibility dictionary with {Count} unique member IDs from {Total} entries", 
+            visibilityDict.Count, visibilities?.Count ?? 0);
+
+        // Add visibility records for all members
+        var recordsAdded = 0;
+        foreach (var member in allMembers)
+        {
+            // Use provided permission if available, otherwise default (creator gets Edit, others get View)
+            var permission = visibilityDict.ContainsKey(member.Id) 
+                ? visibilityDict[member.Id]
+                : (member.UserId == userId ? ItemPermission.Edit : ItemPermission.View);
+
+            var itemVisibility = new VaultItemVisibility
+            {
+                VaultItemId = itemId,
+                VaultMemberId = member.Id,
+                Permission = permission
+            };
+            _dbContext.VaultItemVisibilities.Add(itemVisibility);
+            recordsAdded++;
+            _logger.LogInformation("Added visibility record: ItemId={ItemId}, MemberId={MemberId}, Permission={Permission}", 
+                itemId, member.Id, permission);
+        }
+
+        var saved = await _dbContext.SaveChangesAsync();
+        _logger.LogInformation("Saved {Count} visibility records to database for item {ItemId}", saved, itemId);
     }
 
     private async Task SetDefaultVisibilitiesAsync(int itemId, int vaultId, string userId)
@@ -420,11 +454,13 @@ public class VaultItemService : IVaultItemService
 
         foreach (var member in members)
         {
+            // Creator gets Edit, others get View
+            var permission = member.UserId == userId ? ItemPermission.Edit : ItemPermission.View;
             var visibility = new VaultItemVisibility
             {
                 VaultItemId = itemId,
                 VaultMemberId = member.Id,
-                Permission = ItemPermission.Edit // Default: all members can edit
+                Permission = permission
             };
             _dbContext.VaultItemVisibilities.Add(visibility);
         }
@@ -530,33 +566,30 @@ public class VaultItemService : IVaultItemService
         await Task.CompletedTask;
     }
 
-    private async Task UpdateItemVisibilitiesAsync(int itemId, List<ItemVisibilityDTO> visibilities, string userId)
+    private async Task UpdateItemVisibilitiesAsync(int itemId, List<ItemVisibilityDTO> visibilities, int vaultId, string userId)
     {
-        await SetItemVisibilitiesAsync(itemId, visibilities, userId);
+        await SetItemVisibilitiesAsync(itemId, visibilities, vaultId, userId);
     }
 
     private async Task<ItemPermission?> GetUserPermissionForItemAsync(VaultItem item, string userId)
     {
-        // Check if user is vault owner/admin - they have full access
-        var vaultPrivilege = await _vaultService.GetUserPrivilegeAsync(item.VaultId, userId);
-        if (vaultPrivilege == Privilege.Owner || vaultPrivilege == Privilege.Admin)
-            return ItemPermission.Edit;
-
-        // Check if user is the creator
-        if (item.CreatedByUserId == userId)
-            return ItemPermission.Edit;
-
-        // Check item-specific visibility
+        // First, check if user is a member of the vault
         var member = await _dbContext.VaultMembers
             .FirstOrDefaultAsync(m => m.VaultId == item.VaultId && m.UserId == userId && m.Status == MemberStatus.Active);
 
         if (member == null)
             return null;
 
+        // Check item-specific visibility from VaultItemVisibility table
+        // This is the source of truth - all permissions come from this table
         var visibility = item.Visibilities
             .FirstOrDefault(v => v.VaultMemberId == member.Id);
 
-        return visibility?.Permission;
+        // If no visibility record exists, user cannot see the item
+        if (visibility == null)
+            return null;
+
+        return visibility.Permission;
     }
 
     private async Task<VaultItemResponseDTO> MapToResponseDTO(VaultItem item, string userId)
