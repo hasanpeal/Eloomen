@@ -68,6 +68,13 @@ public class VaultItemService : IVaultItemService
         if (vaultPrivilege == null)
             return new List<VaultItemResponseDTO>();
 
+        // Check vault policy - owner always has access, others need policy to allow access
+        if (!await _vaultService.IsVaultAccessibleAsync(vaultId, userId))
+        {
+            // Return empty list - user can see vault but not items
+            return new List<VaultItemResponseDTO>();
+        }
+
         var items = await _dbContext.VaultItems
             .Include(i => i.CreatedByUser)
             .Include(i => i.Visibilities)
@@ -100,6 +107,11 @@ public class VaultItemService : IVaultItemService
         var vaultPrivilege = await _vaultService.GetUserPrivilegeAsync(dto.VaultId, userId);
         if (vaultPrivilege == null)
             throw new UnauthorizedAccessException("You don't have access to this vault");
+
+        // Check vault-level policy - vault-level policy is superior to item-level permissions
+        // Owner always has access, but admins and members must respect vault policy
+        if (!await _vaultService.IsVaultAccessibleAsync(dto.VaultId, userId))
+            throw new UnauthorizedAccessException("Vault is not accessible due to its release policy. You cannot add items until the vault is released.");
 
         // Get vault encryption key (in production, this should come from user's master key)
         var encryptionKey = await GetVaultEncryptionKeyAsync(dto.VaultId, userId);
@@ -176,6 +188,11 @@ public class VaultItemService : IVaultItemService
         if (item == null || item.Status == ItemStatus.Deleted)
             return null;
 
+        // Check vault-level policy - vault-level policy is superior to item-level permissions
+        // Owner always has access, but admins and members must respect vault policy
+        if (!await _vaultService.IsVaultAccessibleAsync(item.VaultId, userId))
+            throw new UnauthorizedAccessException("Vault is not accessible due to its release policy. You cannot edit items until the vault is released.");
+
         // Check if user can edit - must have Edit permission in VaultItemVisibility
         var permission = await GetUserPermissionAsync(itemId, userId);
         if (permission != ItemPermission.Edit)
@@ -230,6 +247,11 @@ public class VaultItemService : IVaultItemService
         if (item == null || item.Status == ItemStatus.Deleted)
             return false;
 
+        // Check vault-level policy - vault-level policy is superior to item-level permissions
+        // Owner always has access, but admins and members must respect vault policy
+        if (!await _vaultService.IsVaultAccessibleAsync(item.VaultId, userId))
+            return false;
+
         // Check if user can edit
         var permission = await GetUserPermissionAsync(itemId, userId);
         if (permission != ItemPermission.Edit)
@@ -254,6 +276,11 @@ public class VaultItemService : IVaultItemService
         var item = await _dbContext.VaultItems.FirstOrDefaultAsync(i => i.Id == itemId);
 
         if (item == null || item.Status != ItemStatus.Deleted)
+            return false;
+
+        // Check vault-level policy - vault-level policy is superior to item-level permissions
+        // Owner always has access, but admins and members must respect vault policy
+        if (!await _vaultService.IsVaultAccessibleAsync(item.VaultId, userId))
             return false;
 
         // Check if user can edit vault

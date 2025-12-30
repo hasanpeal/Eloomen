@@ -27,7 +27,7 @@ function AcceptInviteContent() {
       setSuccess(true);
       toast.success("Invite accepted successfully!");
       setTimeout(() => {
-        router.push("/vaults");
+        router.push("/dashboard");
       }, 2000);
     } catch (error) {
       const errorMessage =

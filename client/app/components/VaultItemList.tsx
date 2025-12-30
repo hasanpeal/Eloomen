@@ -112,9 +112,7 @@ export default function VaultItemList({
         </div>
       ))}
       {items.length === 0 && (
-        <div className="col-span-full text-center py-12 text-slate-400">
-          No items in this vault yet. Create your first item to get started!
-        </div>
+        <div className="col-span-full text-center py-12 text-slate-400"></div>
       )}
     </div>
   );

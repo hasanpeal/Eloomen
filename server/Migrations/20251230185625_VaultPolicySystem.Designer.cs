@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using server.Models;
@@ -11,9 +12,11 @@ using server.Models;
 namespace server.Migrations
 {
     [DbContext(typeof(ApplicationDBContext))]
-    partial class ApplicationDBContextModelSnapshot : ModelSnapshot
+    [Migration("20251230185625_VaultPolicySystem")]
+    partial class VaultPolicySystem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -446,8 +449,20 @@ namespace server.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<DateTime?>("PolicyExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PolicyType")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Privilege")
                         .HasColumnType("integer");
+
+                    b.Property<long?>("PulseIntervalTicks")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("ReleaseDate")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -695,12 +710,18 @@ namespace server.Migrations
                     b.Property<DateTime?>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("LastPulseDate")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Note")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
                     b.Property<int>("PolicyType")
                         .HasColumnType("integer");
+
+                    b.Property<long?>("PulseIntervalTicks")
+                        .HasColumnType("bigint");
 
                     b.Property<DateTime?>("ReleaseDate")
                         .HasColumnType("timestamp with time zone");
@@ -714,7 +735,7 @@ namespace server.Migrations
                     b.Property<string>("ReleasedById")
                         .HasColumnType("text");
 
-                    b.Property<int>("VaultId")
+                    b.Property<int>("VaultMemberId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
@@ -729,7 +750,7 @@ namespace server.Migrations
 
                     b.HasIndex("ReleasedById");
 
-                    b.HasIndex("VaultId")
+                    b.HasIndex("VaultMemberId")
                         .IsUnique();
 
                     b.ToTable("VaultPolicies", (string)null);
@@ -1030,15 +1051,15 @@ namespace server.Migrations
                         .HasForeignKey("ReleasedById")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("server.Models.Vault", "Vault")
+                    b.HasOne("server.Models.VaultMember", "VaultMember")
                         .WithOne("Policy")
-                        .HasForeignKey("server.Models.VaultPolicy", "VaultId")
+                        .HasForeignKey("server.Models.VaultPolicy", "VaultMemberId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("ReleasedBy");
 
-                    b.Navigation("Vault");
+                    b.Navigation("VaultMember");
                 });
 
             modelBuilder.Entity("server.Models.VerificationCode", b =>
@@ -1064,8 +1085,6 @@ namespace server.Migrations
                     b.Navigation("Items");
 
                     b.Navigation("Members");
-
-                    b.Navigation("Policy");
                 });
 
             modelBuilder.Entity("server.Models.VaultItem", b =>
@@ -1081,6 +1100,11 @@ namespace server.Migrations
                     b.Navigation("Password");
 
                     b.Navigation("Visibilities");
+                });
+
+            modelBuilder.Entity("server.Models.VaultMember", b =>
+                {
+                    b.Navigation("Policy");
                 });
 #pragma warning restore 612, 618
         }

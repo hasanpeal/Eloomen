@@ -13,10 +13,8 @@ public class CreateInviteDTO
     [Required]
     public Privilege Privilege { get; set; }
     
-    [Required]
-    public InviteType InviteType { get; set; }
-    
-    public DateTime? ExpiresAt { get; set; }
+    // Invite expiration (when the invite itself expires)
+    public DateTime? InviteExpiresAt { get; set; }
     
     [MaxLength(500)]
     public string? Note { get; set; }

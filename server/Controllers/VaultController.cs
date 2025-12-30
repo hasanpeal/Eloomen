@@ -273,5 +273,18 @@ public class VaultController : ControllerBase
 
         return Ok(new { message = "Left vault successfully" });
     }
+
+    // Policy operations
+    [HttpPost("{id}/release")]
+    public async Task<ActionResult> ReleaseVaultManually(int id)
+    {
+        var userId = GetUserId();
+        var result = await _vaultService.ReleaseVaultManuallyAsync(id, userId);
+        
+        if (!result)
+            return BadRequest("Cannot release vault (insufficient permissions or policy type doesn't support manual release)");
+
+        return Ok(new { message = "Vault released successfully" });
+    }
 }
 

@@ -17,6 +17,7 @@ public class ApplicationDBContext : IdentityDbContext<User>
     public DbSet<Vault> Vaults { get; set; }
     public DbSet<VaultInvite> VaultInvites { get; set; }
     public DbSet<VaultMember> VaultMembers { get; set; }
+    public DbSet<VaultPolicy> VaultPolicies { get; set; }
     public DbSet<VaultItem> VaultItems { get; set; }
     public DbSet<VaultItemVisibility> VaultItemVisibilities { get; set; }
     public DbSet<VaultDocument> VaultDocuments { get; set; }
@@ -179,6 +180,29 @@ public class ApplicationDBContext : IdentityDbContext<User>
             entity.HasOne(e => e.RemovedBy)
                 .WithMany()
                 .HasForeignKey(e => e.RemovedById)
+                .OnDelete(DeleteBehavior.SetNull);
+            
+        });
+
+        // VaultPolicies configuration
+        builder.Entity<VaultPolicy>(entity =>
+        {
+            entity.ToTable("VaultPolicies");
+            entity.HasIndex(e => e.VaultId).IsUnique();
+            entity.HasIndex(e => e.PolicyType);
+            entity.HasIndex(e => e.ReleaseStatus);
+            entity.HasIndex(e => e.ReleaseDate);
+            entity.HasIndex(e => e.ExpiresAt);
+            
+            entity.HasOne(e => e.Vault)
+                .WithOne(e => e.Policy)
+                .HasForeignKey<VaultPolicy>(e => e.VaultId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+            
+            entity.HasOne(e => e.ReleasedBy)
+                .WithMany()
+                .HasForeignKey(e => e.ReleasedById)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 

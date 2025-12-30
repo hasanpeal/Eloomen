@@ -541,6 +541,18 @@ class ApiClient {
     });
   }
 
+  // Policy methods
+  async releaseVaultManually(
+    vaultId: number
+  ): Promise<{ message: string }> {
+    return this.request<{ message: string }>(
+      `/vault/${vaultId}/release`,
+      {
+        method: "POST",
+      }
+    );
+  }
+
   // Vault Item API methods
   async getVaultItems(vaultId: number): Promise<VaultItem[]> {
     return this.request<VaultItem[]>(`/vault/${vaultId}/items`, {
@@ -784,6 +796,7 @@ export interface Vault {
   createdAt: string;
   deletedAt?: string;
   userPrivilege?: "Owner" | "Admin" | "Member";
+  policy?: VaultPolicy;
 }
 
 export interface VaultInvite {
@@ -794,9 +807,7 @@ export interface VaultInvite {
   inviteeEmail: string;
   inviteeId?: string;
   privilege: "Owner" | "Admin" | "Member";
-  inviteType: "Immediate" | "Delayed";
   status: "Pending" | "Sent" | "Accepted" | "Cancelled" | "Expired";
-  sentAt?: string;
   expiresAt?: string;
   createdAt: string;
   acceptedAt?: string;
@@ -822,21 +833,34 @@ export interface VaultMember {
   removedAt?: string;
 }
 
+export interface VaultPolicy {
+  policyType: "Immediate" | "TimeBased" | "ExpiryBased" | "ManualRelease";
+  releaseStatus: "Pending" | "Released" | "Expired" | "Revoked";
+  releaseDate?: string;
+  expiresAt?: string;
+  releasedAt?: string;
+}
+
 export interface CreateVaultRequest {
   name: string;
   description?: string;
+  policyType: "Immediate" | "TimeBased" | "ExpiryBased" | "ManualRelease";
+  releaseDate?: string;
+  expiresAt?: string;
 }
 
 export interface UpdateVaultRequest {
   name: string;
   description?: string;
+  policyType: "Immediate" | "TimeBased" | "ExpiryBased" | "ManualRelease";
+  releaseDate?: string;
+  expiresAt?: string;
 }
 
 export interface CreateInviteRequest {
   inviteeEmail: string;
   privilege: "Owner" | "Admin" | "Member";
-  inviteType: "Immediate" | "Delayed";
-  expiresAt?: string;
+  inviteExpiresAt?: string; // When the invite itself expires - ISO date string
   note?: string;
 }
 

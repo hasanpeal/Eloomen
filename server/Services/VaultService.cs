@@ -35,19 +35,37 @@ public class VaultService : IVaultService
     {
         var vault = await _dbContext.Vaults
             .Include(v => v.Owner)
+            .Include(v => v.Policy)
             .FirstOrDefaultAsync(v => v.Id == vaultId);
 
         if (vault == null)
             return null;
 
-        // Check if user has access
+        // Owner always has access
+        var isOwner = vault.OwnerId == userId;
+        
+        // Check if user is a member
         var privilege = await GetUserPrivilegeAsync(vaultId, userId);
-        if (privilege == null && vault.OwnerId != userId)
+        var isMember = privilege != null || isOwner;
+
+        if (!isMember)
             return null;
 
         // Don't return deleted vaults unless user is owner
-        if (vault.Status == VaultStatus.Deleted && vault.OwnerId != userId)
+        if (vault.Status == VaultStatus.Deleted && !isOwner)
             return null;
+
+        // Vault-level policy is superior - non-owners cannot access vault if policy blocks access
+        // Owner always has access regardless of policy
+        if (!isOwner && vault.Policy != null)
+        {
+            // Check general policy accessibility
+            if (!IsVaultAccessible(vault.Policy))
+            {
+                // Return null to block access - frontend will handle showing appropriate message
+                return null;
+            }
+        }
 
         // Get original owner info
         var originalOwner = await _userManager.FindByIdAsync(vault.OriginalOwnerId);
@@ -66,7 +84,8 @@ public class VaultService : IVaultService
             Status = vault.Status,
             CreatedAt = vault.CreatedAt,
             DeletedAt = vault.DeletedAt,
-            UserPrivilege = privilege ?? (vault.OwnerId == userId ? Privilege.Owner : null)
+            UserPrivilege = privilege ?? (isOwner ? Privilege.Owner : null),
+            Policy = vault.Policy != null ? MapPolicyToDTO(vault.Policy) : null
         };
     }
 
@@ -74,6 +93,7 @@ public class VaultService : IVaultService
     {
         var vaults = await _dbContext.Vaults
             .Include(v => v.Members)
+            .Include(v => v.Policy)
             .Where(v => v.Status == VaultStatus.Active && 
                        (v.OwnerId == userId || 
                         v.Members.Any(m => m.UserId == userId && m.Status == MemberStatus.Active)))
@@ -82,7 +102,10 @@ public class VaultService : IVaultService
         var result = new List<VaultResponseDTO>();
         foreach (var vault in vaults)
         {
+            var isOwner = vault.OwnerId == userId;
             var privilege = await GetUserPrivilegeAsync(vault.Id, userId);
+            
+            // Include all vaults (even if not accessible) so users can see when they'll get access
             result.Add(new VaultResponseDTO
             {
                 Id = vault.Id,
@@ -93,7 +116,8 @@ public class VaultService : IVaultService
                 Status = vault.Status,
                 CreatedAt = vault.CreatedAt,
                 DeletedAt = vault.DeletedAt,
-                UserPrivilege = privilege ?? (vault.OwnerId == userId ? Privilege.Owner : null)
+                UserPrivilege = privilege ?? (isOwner ? Privilege.Owner : null),
+                Policy = vault.Policy != null ? MapPolicyToDTO(vault.Policy) : null
             });
         }
 
@@ -102,6 +126,9 @@ public class VaultService : IVaultService
 
     public async Task<VaultResponseDTO> CreateVaultAsync(CreateVaultDTO dto, string userId)
     {
+        // Validate policy configuration
+        ValidatePolicyConfiguration(dto.PolicyType, dto.ReleaseDate, null, dto.ExpiresAt);
+
         var vault = new Vault
         {
             OwnerId = userId,
@@ -129,6 +156,30 @@ public class VaultService : IVaultService
         _dbContext.VaultMembers.Add(member);
         await _dbContext.SaveChangesAsync();
 
+        // Create vault policy
+        var policy = new VaultPolicy
+        {
+            VaultId = vault.Id,
+            PolicyType = dto.PolicyType,
+            // Set time to 9 AM UTC for date-only inputs
+            ReleaseDate = dto.ReleaseDate.HasValue 
+                ? dto.ReleaseDate.Value.Date.AddHours(9) 
+                : null,
+            ExpiresAt = dto.ExpiresAt.HasValue 
+                ? dto.ExpiresAt.Value.Date.AddHours(9) 
+                : null,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Determine initial release status based on policy type using the helper method
+        SetPolicyReleaseStatus(policy);
+
+        _dbContext.VaultPolicies.Add(policy);
+        await _dbContext.SaveChangesAsync();
+
+        // Load policy for response
+        await _dbContext.Entry(vault).Reference(v => v.Policy).LoadAsync();
+
         return new VaultResponseDTO
         {
             Id = vault.Id,
@@ -139,27 +190,68 @@ public class VaultService : IVaultService
             Status = vault.Status,
             CreatedAt = vault.CreatedAt,
             DeletedAt = vault.DeletedAt,
-            UserPrivilege = Privilege.Owner
+            UserPrivilege = Privilege.Owner,
+            Policy = vault.Policy != null ? MapPolicyToDTO(vault.Policy) : null
         };
     }
 
     public async Task<VaultResponseDTO?> UpdateVaultAsync(int vaultId, UpdateVaultDTO dto, string userId)
     {
         var vault = await _dbContext.Vaults
+            .Include(v => v.Policy)
             .FirstOrDefaultAsync(v => v.Id == vaultId);
 
         if (vault == null || vault.Status == VaultStatus.Deleted)
             return null;
 
-        // Check permissions: Owner or Admin can edit
+        // Check permissions: Only Owner can edit vault and policy
         var privilege = await GetUserPrivilegeAsync(vaultId, userId);
-        if (privilege != Privilege.Owner && privilege != Privilege.Admin)
+        if (privilege != Privilege.Owner)
             return null;
 
         vault.Name = dto.Name;
         vault.Description = dto.Description;
 
+        // Validate and update policy
+        ValidatePolicyConfiguration(dto.PolicyType, dto.ReleaseDate, null, dto.ExpiresAt);
+
+        if (vault.Policy == null)
+        {
+            // Create new policy
+            vault.Policy = new VaultPolicy
+            {
+                VaultId = vault.Id,
+                PolicyType = dto.PolicyType,
+                // Set time to 9 AM UTC for date-only inputs
+                ReleaseDate = dto.ReleaseDate.HasValue 
+                    ? dto.ReleaseDate.Value.Date.AddHours(9) 
+                    : null,
+                ExpiresAt = dto.ExpiresAt.HasValue 
+                    ? dto.ExpiresAt.Value.Date.AddHours(9) 
+                    : null,
+                CreatedAt = DateTime.UtcNow
+            };
+            SetPolicyReleaseStatus(vault.Policy);
+            _dbContext.VaultPolicies.Add(vault.Policy);
+        }
+        else
+        {
+            // Update existing policy
+            vault.Policy.PolicyType = dto.PolicyType;
+            // Set time to 9 AM UTC for date-only inputs
+            vault.Policy.ReleaseDate = dto.ReleaseDate.HasValue 
+                ? dto.ReleaseDate.Value.Date.AddHours(9) 
+                : null;
+            vault.Policy.ExpiresAt = dto.ExpiresAt.HasValue 
+                ? dto.ExpiresAt.Value.Date.AddHours(9) 
+                : null;
+            SetPolicyReleaseStatus(vault.Policy);
+        }
+
         await _dbContext.SaveChangesAsync();
+
+        // Reload policy
+        await _dbContext.Entry(vault).Reference(v => v.Policy).LoadAsync();
 
         return new VaultResponseDTO
         {
@@ -171,7 +263,8 @@ public class VaultService : IVaultService
             Status = vault.Status,
             CreatedAt = vault.CreatedAt,
             DeletedAt = vault.DeletedAt,
-            UserPrivilege = privilege ?? Privilege.Owner
+            UserPrivilege = Privilege.Owner,
+            Policy = vault.Policy != null ? MapPolicyToDTO(vault.Policy) : null
         };
     }
 
@@ -220,15 +313,17 @@ public class VaultService : IVaultService
     public async Task<VaultInviteResponseDTO> CreateInviteAsync(int vaultId, CreateInviteDTO dto, string inviterId)
     {
         var vault = await _dbContext.Vaults
+            .Include(v => v.Policy)
             .FirstOrDefaultAsync(v => v.Id == vaultId);
 
         if (vault == null || vault.Status == VaultStatus.Deleted)
             throw new InvalidOperationException("Vault not found");
 
-        // Check permissions: Owner or Admin can invite
+        // Only owners can invite - vault-level policy is superior
         var privilege = await GetUserPrivilegeAsync(vaultId, inviterId);
-        if (privilege != Privilege.Owner && privilege != Privilege.Admin)
-            throw new UnauthorizedAccessException("Insufficient permissions");
+        var isOwner = vault.OwnerId == inviterId;
+        if (!isOwner)
+            throw new UnauthorizedAccessException("Only owners can invite members");
 
         // Admins cannot invite as Owner
         if (privilege == Privilege.Admin && dto.Privilege == Privilege.Owner)
@@ -255,9 +350,11 @@ public class VaultService : IVaultService
             InviteeEmail = dto.InviteeEmail,
             InviteeId = (await _userManager.FindByEmailAsync(dto.InviteeEmail))?.Id,
             Privilege = dto.Privilege,
-            InviteType = dto.InviteType,
             Status = InviteStatus.Pending,
-            ExpiresAt = dto.ExpiresAt ?? DateTime.UtcNow.AddDays(7),
+            // Set time to 9 AM UTC for date-only inputs, default to 7 days from now
+            ExpiresAt = dto.InviteExpiresAt.HasValue 
+                ? dto.InviteExpiresAt.Value.Date.AddHours(9) 
+                : DateTime.UtcNow.Date.AddDays(7).AddHours(9),
             TokenHash = tokenHash,
             CreatedAt = DateTime.UtcNow,
             Note = dto.Note
@@ -269,21 +366,17 @@ public class VaultService : IVaultService
         // Get inviter info before sending email
         var inviter = await _userManager.FindByIdAsync(inviterId);
         
-        // Send email if immediate invite
-        // Note: Making this synchronous for now to ensure emails are sent and errors are caught
-        if (dto.InviteType == InviteType.Immediate)
+        // Always send email immediately (invites are always immediate now)
+        try
         {
-            try
-            {
-                await SendInviteEmailAsync(invite, token);
-            }
-            catch (Exception ex)
-            {
-                // Log error but don't fail the invite creation
-                _logger.LogError(ex, "Failed to send invite email for invite {InviteId}, but invite was created", invite.Id);
-                // Reload invite to get latest status
-                await _dbContext.Entry(invite).ReloadAsync();
-            }
+            await SendInviteEmailAsync(invite, token);
+        }
+        catch (Exception ex)
+        {
+            // Log error but don't fail the invite creation
+            _logger.LogError(ex, "Failed to send invite email for invite {InviteId}, but invite was created", invite.Id);
+            // Reload invite to get latest status
+            await _dbContext.Entry(invite).ReloadAsync();
         }
         
         return new VaultInviteResponseDTO
@@ -295,9 +388,7 @@ public class VaultService : IVaultService
             InviteeEmail = invite.InviteeEmail,
             InviteeId = invite.InviteeId,
             Privilege = invite.Privilege,
-            InviteType = invite.InviteType,
             Status = invite.Status,
-            SentAt = invite.SentAt,
             ExpiresAt = invite.ExpiresAt,
             CreatedAt = invite.CreatedAt,
             AcceptedAt = invite.AcceptedAt,
@@ -308,15 +399,26 @@ public class VaultService : IVaultService
     public async Task<List<VaultInviteResponseDTO>> GetVaultInvitesAsync(int vaultId, string userId)
     {
         var vault = await _dbContext.Vaults
+            .Include(v => v.Policy)
             .FirstOrDefaultAsync(v => v.Id == vaultId);
 
         if (vault == null)
             return new List<VaultInviteResponseDTO>();
 
-        // Check permissions: Owner or Admin can view invites
+        // Owner always has access
+        var isOwner = vault.OwnerId == userId;
+
+        // Check permissions: Only Owner can view invites (vault-level policy is superior)
         var privilege = await GetUserPrivilegeAsync(vaultId, userId);
-        if (privilege != Privilege.Owner && privilege != Privilege.Admin)
+        if (!isOwner)
             return new List<VaultInviteResponseDTO>();
+
+        // Vault-level policy is superior - non-owners cannot access invites if policy blocks access
+        if (!isOwner && vault.Policy != null)
+        {
+            if (!IsVaultAccessible(vault.Policy))
+                return new List<VaultInviteResponseDTO>();
+        }
 
         var invites = await _dbContext.VaultInvites
             .Where(i => i.VaultId == vaultId)
@@ -332,9 +434,7 @@ public class VaultService : IVaultService
             InviteeEmail = i.InviteeEmail,
             InviteeId = i.InviteeId,
             Privilege = i.Privilege,
-            InviteType = i.InviteType,
             Status = i.Status,
-            SentAt = i.SentAt,
             ExpiresAt = i.ExpiresAt,
             CreatedAt = i.CreatedAt,
             AcceptedAt = i.AcceptedAt,
@@ -351,10 +451,11 @@ public class VaultService : IVaultService
         if (invite == null || invite.Status == InviteStatus.Accepted || invite.Status == InviteStatus.Cancelled)
             return false;
 
-        var privilege = await GetUserPrivilegeAsync(invite.VaultId, userId);
+        var vault = invite.Vault;
+        var isOwner = vault.OwnerId == userId;
         
-        // Owner can cancel any invite, Admin can only cancel their own
-        if (privilege != Privilege.Owner && (privilege != Privilege.Admin || invite.InviterId != userId))
+        // Vault-level policy is superior - only owners can manage invites
+        if (!isOwner)
             return false;
 
         invite.Status = InviteStatus.Cancelled;
@@ -371,17 +472,17 @@ public class VaultService : IVaultService
         if (invite == null || invite.Status == InviteStatus.Accepted || invite.Status == InviteStatus.Cancelled)
             return false;
 
-        var privilege = await GetUserPrivilegeAsync(invite.VaultId, userId);
+        var vault = invite.Vault;
+        var isOwner = vault.OwnerId == userId;
         
-        // Owner can resend any invite, Admin can only resend their own
-        if (privilege != Privilege.Owner && (privilege != Privilege.Admin || invite.InviterId != userId))
+        // Vault-level policy is superior - only owners can manage invites
+        if (!isOwner)
             return false;
 
         // Generate new token
         var token = GenerateInviteToken();
         invite.TokenHash = HashToken(token);
         invite.Status = InviteStatus.Pending;
-        invite.SentAt = null;
 
         await _dbContext.SaveChangesAsync();
 
@@ -554,12 +655,25 @@ public class VaultService : IVaultService
 
     public async Task<List<VaultMemberResponseDTO>> GetVaultMembersAsync(int vaultId, string userId)
     {
+        var vault = await _dbContext.Vaults
+            .Include(v => v.Policy)
+            .FirstOrDefaultAsync(v => v.Id == vaultId);
+
+        if (vault == null)
+            return new List<VaultMemberResponseDTO>();
+
+        // Owner always has access
+        var isOwner = vault.OwnerId == userId;
+        
         // Check if user has access to vault
         var privilege = await GetUserPrivilegeAsync(vaultId, userId);
-        if (privilege == null)
+        if (privilege == null && !isOwner)
+            return new List<VaultMemberResponseDTO>();
+
+        // Vault-level policy is superior - non-owners cannot access members if policy blocks access
+        if (!isOwner && vault.Policy != null)
         {
-            var vault = await _dbContext.Vaults.FirstOrDefaultAsync(v => v.Id == vaultId);
-            if (vault?.OwnerId != userId)
+            if (!IsVaultAccessible(vault.Policy))
                 return new List<VaultMemberResponseDTO>();
         }
 
@@ -595,98 +709,60 @@ public class VaultService : IVaultService
     {
         var member = await _dbContext.VaultMembers
             .Include(m => m.Vault)
+                .ThenInclude(v => v.Policy)
             .FirstOrDefaultAsync(m => m.Id == memberId && m.VaultId == vaultId);
 
         if (member == null || member.Status != MemberStatus.Active)
             return false;
 
+        var vault = member.Vault;
+        var isOwner = vault.OwnerId == userId;
         var privilege = await GetUserPrivilegeAsync(vaultId, userId);
 
+        // Vault-level policy is superior - only owners can manage members
+        if (!isOwner)
+            return false;
+
         // Owner can remove anyone (except themselves without transfer)
-        if (privilege == Privilege.Owner)
-        {
-            // Owner cannot remove themselves
-            if (member.UserId == userId)
-                return false;
+        // Owner cannot remove themselves
+        if (member.UserId == userId)
+            return false;
 
-            member.Status = MemberStatus.Removed;
-            member.RemovedById = userId;
-            member.RemovedAt = DateTime.UtcNow;
-            await _dbContext.SaveChangesAsync();
-            return true;
-        }
-
-        // Admin can only remove Members
-        if (privilege == Privilege.Admin && member.Privilege == Privilege.Member)
-        {
-            member.Status = MemberStatus.Removed;
-            member.RemovedById = userId;
-            member.RemovedAt = DateTime.UtcNow;
-            await _dbContext.SaveChangesAsync();
-            return true;
-        }
-
-        return false;
+        member.Status = MemberStatus.Removed;
+        member.RemovedById = userId;
+        member.RemovedAt = DateTime.UtcNow;
+        await _dbContext.SaveChangesAsync();
+        return true;
     }
 
     public async Task<bool> UpdateMemberPrivilegeAsync(int vaultId, UpdateMemberPrivilegeDTO dto, string userId)
     {
         var member = await _dbContext.VaultMembers
             .Include(m => m.Vault)
+                .ThenInclude(v => v.Policy)
             .FirstOrDefaultAsync(m => m.Id == dto.MemberId && m.VaultId == vaultId);
 
         if (member == null || member.Status != MemberStatus.Active)
             return false;
 
-        var privilege = await GetUserPrivilegeAsync(vaultId, userId);
+        var vault = member.Vault;
+        var isOwner = vault.OwnerId == userId;
 
-        // Owner can change any member's privilege
-        if (privilege == Privilege.Owner)
-        {
-            // Cannot change owner privilege (must use transfer ownership)
-            if (member.Privilege == Privilege.Owner && dto.Privilege != Privilege.Owner)
-                return false;
+        // Vault-level policy is superior - only owners can manage members
+        if (!isOwner)
+            return false;
 
-            // If promoting to Owner, must use transfer ownership
-            if (dto.Privilege == Privilege.Owner)
-                return false;
+        // Cannot change owner privilege (must use transfer ownership)
+        if (member.Privilege == Privilege.Owner && dto.Privilege != Privilege.Owner)
+            return false;
 
-            member.Privilege = dto.Privilege;
-            await _dbContext.SaveChangesAsync();
-            return true;
-        }
+        // If promoting to Owner, must use transfer ownership
+        if (dto.Privilege == Privilege.Owner)
+            return false;
 
-        // Admin can change Member and Admin privileges (Member ↔ Admin, but not Owner)
-        // Admin can promote Members to Admin, or demote Admins to Member
-        if (privilege == Privilege.Admin)
-        {
-            // Cannot change Owner privileges
-            if (member.Privilege == Privilege.Owner)
-                return false;
-            
-            // Cannot promote to Owner
-            if (dto.Privilege == Privilege.Owner)
-                return false;
-            
-            // Can change Member to Admin or keep as Member
-            if (member.Privilege == Privilege.Member && 
-                (dto.Privilege == Privilege.Member || dto.Privilege == Privilege.Admin))
-            {
-                member.Privilege = dto.Privilege;
-                await _dbContext.SaveChangesAsync();
-                return true;
-            }
-            
-            // Can demote Admin to Member
-            if (member.Privilege == Privilege.Admin && dto.Privilege == Privilege.Member)
-            {
-                member.Privilege = dto.Privilege;
-                await _dbContext.SaveChangesAsync();
-                return true;
-            }
-        }
-
-        return false;
+        member.Privilege = dto.Privilege;
+        await _dbContext.SaveChangesAsync();
+        return true;
     }
 
     public async Task<bool> TransferOwnershipAsync(int vaultId, TransferOwnershipDTO dto, string userId)
@@ -786,6 +862,31 @@ public class VaultService : IVaultService
         return vault?.OwnerId == userId;
     }
 
+    public async Task<bool> IsVaultAccessibleAsync(int vaultId, string userId)
+    {
+        var vault = await _dbContext.Vaults
+            .Include(v => v.Policy)
+            .FirstOrDefaultAsync(v => v.Id == vaultId);
+
+        if (vault == null)
+            return false;
+
+        // Owner always has access
+        if (vault.OwnerId == userId)
+            return true;
+
+        // Check if user is a member
+        var privilege = await GetUserPrivilegeAsync(vaultId, userId);
+        if (privilege == null)
+            return false;
+
+        // Check vault policy
+        if (vault.Policy == null)
+            return true; // No policy means accessible
+
+        return IsVaultAccessible(vault.Policy);
+    }
+
     // Helper methods
     private string GenerateInviteToken()
     {
@@ -841,9 +942,8 @@ public class VaultService : IVaultService
             
             _logger.LogInformation("Successfully sent vault invite email to {Email} for vault {VaultId}", invite.InviteeEmail, invite.VaultId);
             
-            // Update invite status to Sent
+            // Update invite status to Sent (for tracking purposes)
             invite.Status = InviteStatus.Sent;
-            invite.SentAt = DateTime.UtcNow;
             
             // Save changes - wrap in try-catch in case of concurrency issues
             try
@@ -874,6 +974,152 @@ public class VaultService : IVaultService
             {
                 _logger.LogWarning(saveEx, "Failed to update invite {InviteId} status to Pending", invite.Id);
             }
+        }
+    }
+
+    private void ValidatePolicyConfiguration(PolicyType policyType, DateTime? releaseDate, int? pulseIntervalDays, DateTime? expiresAt)
+    {
+        switch (policyType)
+        {
+            case PolicyType.TimeBased:
+                if (!releaseDate.HasValue)
+                    throw new ArgumentException("ReleaseDate is required for TimeBased policy");
+                // Compare dates only (ignore time) - must be future (not today)
+                if (releaseDate.Value.Date <= DateTime.UtcNow.Date)
+                    throw new ArgumentException("ReleaseDate must be in the future for TimeBased policy");
+                break;
+            
+            case PolicyType.ExpiryBased:
+                if (!expiresAt.HasValue)
+                    throw new ArgumentException("ExpiresAt is required for ExpiryBased policy");
+                // Compare dates only (ignore time) - must be future (not today)
+                if (expiresAt.Value.Date <= DateTime.UtcNow.Date)
+                    throw new ArgumentException("ExpiresAt must be in the future for ExpiryBased policy");
+                break;
+            
+            case PolicyType.Immediate:
+            case PolicyType.ManualRelease:
+                // No additional validation needed
+                break;
+        }
+    }
+
+    public async Task<bool> ReleaseVaultManuallyAsync(int vaultId, string userId)
+    {
+        var vault = await _dbContext.Vaults
+            .Include(v => v.Policy)
+            .FirstOrDefaultAsync(v => v.Id == vaultId);
+
+        if (vault == null || vault.Policy == null)
+            return false;
+
+        // Check permissions: Only Owner can manually release
+        var privilege = await GetUserPrivilegeAsync(vaultId, userId);
+        if (privilege != Privilege.Owner)
+            return false;
+
+        if (vault.Policy.PolicyType != PolicyType.ManualRelease)
+            return false;
+
+        if (vault.Policy.ReleaseStatus != ReleaseStatus.Pending)
+            return false;
+
+        vault.Policy.ReleaseStatus = ReleaseStatus.Released;
+        vault.Policy.ReleasedAt = DateTime.UtcNow;
+        vault.Policy.ReleasedById = userId;
+
+        await _dbContext.SaveChangesAsync();
+        return true;
+    }
+
+    // Helper methods for policy
+    private bool IsVaultAccessible(VaultPolicy policy)
+    {
+        if (policy.ReleaseStatus == ReleaseStatus.Expired || policy.ReleaseStatus == ReleaseStatus.Revoked)
+            return false;
+
+        if (policy.ReleaseStatus == ReleaseStatus.Released)
+        {
+            // Check if expired (for ExpiryBased)
+            if (policy.PolicyType == PolicyType.ExpiryBased && policy.ExpiresAt.HasValue)
+            {
+                if (DateTime.UtcNow > policy.ExpiresAt.Value)
+                {
+                    policy.ReleaseStatus = ReleaseStatus.Expired;
+                    // Save the change
+                    _dbContext.Entry(policy).State = Microsoft.EntityFrameworkCore.EntityState.Modified;
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // Check if TimeBased policy should be released now
+        if (policy.PolicyType == PolicyType.TimeBased && policy.ReleaseDate.HasValue)
+        {
+            if (DateTime.UtcNow >= policy.ReleaseDate.Value)
+            {
+                policy.ReleaseStatus = ReleaseStatus.Released;
+                policy.ReleasedAt = DateTime.UtcNow;
+                // Save the change
+                _dbContext.Entry(policy).State = Microsoft.EntityFrameworkCore.EntityState.Modified;
+                return true;
+            }
+            return false;
+        }
+
+        // For Pending status: ManualRelease requires owner action, so non-owners cannot access
+        // TimeBased is handled above
+        if (policy.ReleaseStatus == ReleaseStatus.Pending)
+        {
+            // TimeBased is already handled above
+            // For ManualRelease, return false (not accessible until owner acts)
+            if (policy.PolicyType == PolicyType.ManualRelease)
+            {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    private VaultPolicyResponseDTO MapPolicyToDTO(VaultPolicy policy)
+    {
+        return new VaultPolicyResponseDTO
+        {
+            PolicyType = policy.PolicyType,
+            ReleaseStatus = policy.ReleaseStatus,
+            ReleaseDate = policy.ReleaseDate,
+            ExpiresAt = policy.ExpiresAt,
+            ReleasedAt = policy.ReleasedAt
+        };
+    }
+
+    private void SetPolicyReleaseStatus(VaultPolicy policy)
+    {
+        switch (policy.PolicyType)
+        {
+            case PolicyType.Immediate:
+                policy.ReleaseStatus = ReleaseStatus.Released;
+                policy.ReleasedAt = DateTime.UtcNow;
+                break;
+            
+            case PolicyType.TimeBased:
+                policy.ReleaseStatus = ReleaseStatus.Pending;
+                // Will be released when ReleaseDate is reached
+                break;
+            
+            case PolicyType.ExpiryBased:
+                policy.ReleaseStatus = ReleaseStatus.Released;
+                policy.ReleasedAt = DateTime.UtcNow;
+                // Will expire at ExpiresAt
+                break;
+            
+            case PolicyType.ManualRelease:
+                policy.ReleaseStatus = ReleaseStatus.Pending;
+                // Requires manual release
+                break;
         }
     }
 }

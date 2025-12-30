@@ -11,6 +11,7 @@ import {
   VaultInvite,
   VaultItem,
   CreateInviteRequest,
+  CreateVaultRequest,
   SessionExpiredError,
 } from "../../lib/api";
 import toast from "react-hot-toast";
@@ -32,6 +33,7 @@ export default function VaultDetailPage() {
   const [invites, setInvites] = useState<VaultInvite[]>([]);
   const [items, setItems] = useState<VaultItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("items");
   const [showItemModal, setShowItemModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -50,10 +52,19 @@ export default function VaultDetailPage() {
   const [inviteForm, setInviteForm] = useState<CreateInviteRequest>({
     inviteeEmail: "",
     privilege: "Member",
-    inviteType: "Immediate",
     note: "",
   });
-  const [editForm, setEditForm] = useState({ name: "", description: "" });
+  const [editForm, setEditForm] = useState<{
+    name: string;
+    description: string;
+    policyType: "Immediate" | "TimeBased" | "ExpiryBased" | "ManualRelease";
+    releaseDate?: string;
+    expiresAt?: string;
+  }>({
+    name: "",
+    description: "",
+    policyType: "Immediate",
+  });
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -64,12 +75,118 @@ export default function VaultDetailPage() {
   const loadVaultData = useCallback(async () => {
     try {
       setLoading(true);
-      const [vaultData, membersData, invitesData, itemsData] = await Promise.all([
-        apiClient.getVault(vaultId),
-        apiClient.getVaultMembers(vaultId),
-        apiClient.getVaultInvites(vaultId),
+      setAccessDenied(false);
+
+      // Try to load vault first - this will fail with 404 if access is denied
+      let vaultData: Vault;
+      try {
+        vaultData = await apiClient.getVault(vaultId);
+      } catch (vaultError) {
+        // Check if this is a 404/access denied error
+        const errorMessage =
+          vaultError instanceof Error ? vaultError.message : String(vaultError);
+        console.error("Error loading vault:", vaultError);
+
+        // Check for any 404 or access denied indicators
+        if (
+          errorMessage.includes("Vault not found or access denied") ||
+          errorMessage.includes("access denied") ||
+          errorMessage.includes("404") ||
+          errorMessage.includes("Not Found") ||
+          (vaultError instanceof Error && vaultError.message.includes("404"))
+        ) {
+          setAccessDenied(true);
+          setVault(null);
+          toast.error(
+            "Access denied. This vault is not accessible due to its release policy."
+          );
+          // Redirect to dashboard after a short delay
+          setTimeout(() => {
+            router.push("/dashboard");
+          }, 2000);
+          return;
+        }
+        throw vaultError; // Re-throw if it's a different error
+      }
+
+      // If we got here, vault loaded successfully
+      // Now check if the user (non-owner) should have access based on policy
+      const isOwner = vaultData.userPrivilege === "Owner";
+      if (!isOwner && vaultData.policy) {
+        // Check policy access using the same logic as backend
+        const policy = vaultData.policy;
+        const now = new Date();
+
+        // Check if expired or revoked
+        if (
+          policy.releaseStatus === "Expired" ||
+          policy.releaseStatus === "Revoked"
+        ) {
+          setAccessDenied(true);
+          setVault(null);
+          toast.error(
+            "Access denied. This vault is not accessible due to its release policy."
+          );
+          setTimeout(() => {
+            router.push("/dashboard");
+          }, 2000);
+          return;
+        }
+
+        // Check if pending (not released yet)
+        if (policy.releaseStatus === "Pending") {
+          // For TimeBased, check if release date has passed
+          if (policy.policyType === "TimeBased" && policy.releaseDate) {
+            const releaseDate = new Date(policy.releaseDate);
+            if (now < releaseDate) {
+              setAccessDenied(true);
+              setVault(null);
+              toast.error(
+                "Access denied. This vault is not accessible due to its release policy."
+              );
+              setTimeout(() => {
+                router.push("/dashboard");
+              }, 2000);
+              return;
+            }
+          } else if (policy.policyType === "ManualRelease") {
+            // These require action to release
+            setAccessDenied(true);
+            setVault(null);
+            toast.error(
+              "Access denied. This vault is not accessible due to its release policy."
+            );
+            setTimeout(() => {
+              router.push("/dashboard");
+            }, 2000);
+            return;
+          }
+        }
+
+        // Check if released but expired (for ExpiryBased or InactivityBased)
+        if (policy.releaseStatus === "Released") {
+          if (policy.policyType === "ExpiryBased" && policy.expiresAt) {
+            const expiresAt = new Date(policy.expiresAt);
+            if (now > expiresAt) {
+              setAccessDenied(true);
+              setVault(null);
+              toast.error("Access denied. This vault has expired.");
+              setTimeout(() => {
+                router.push("/dashboard");
+              }, 2000);
+              return;
+            }
+          }
+        }
+      }
+
+      // Load other data in parallel (these might also fail if access is denied)
+      const [membersData, invitesData, itemsData] = await Promise.all([
+        apiClient.getVaultMembers(vaultId).catch(() => []), // Don't fail if members fail to load
+        apiClient.getVaultInvites(vaultId).catch(() => []), // Don't fail if invites fail to load
         apiClient.getVaultItems(vaultId).catch(() => []), // Don't fail if items fail to load
       ]);
+
       setVault(vaultData);
       setMembers(membersData || []);
       setInvites(invitesData || []);
@@ -77,6 +194,9 @@ export default function VaultDetailPage() {
       setEditForm({
         name: vaultData.name,
         description: vaultData.description || "",
+        policyType: vaultData.policy?.policyType || "Immediate",
+        releaseDate: vaultData.policy?.releaseDate,
+        expiresAt: vaultData.policy?.expiresAt,
       });
       // Debug logging
       console.log("Vault members loaded:", membersData);
@@ -93,14 +213,34 @@ export default function VaultDetailPage() {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to load vault data";
       console.error("Error loading vault data:", error);
+
+      // Final check for access denied
+      if (
+        errorMessage.includes("Vault not found or access denied") ||
+        errorMessage.includes("access denied") ||
+        errorMessage.includes("404") ||
+        errorMessage.includes("Not Found")
+      ) {
+        setAccessDenied(true);
+        setVault(null);
+        toast.error(
+          "Access denied. This vault is not accessible due to its release policy."
+        );
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 2000);
+        return;
+      }
+
       toast.error(errorMessage);
-      // Don't redirect on error, just show empty state
+      // Don't redirect on other errors, just show empty state
       setMembers([]);
       setInvites([]);
+      setVault(null);
     } finally {
       setLoading(false);
     }
-  }, [vaultId]);
+  }, [vaultId, router]);
 
   useEffect(() => {
     if (isAuthenticated && vaultId) {
@@ -143,7 +283,6 @@ export default function VaultDetailPage() {
       setInviteForm({
         inviteeEmail: "",
         privilege: "Member",
-        inviteType: "Immediate",
         note: "",
       });
       loadVaultData();
@@ -271,6 +410,21 @@ export default function VaultDetailPage() {
     }
   };
 
+  const handleReleaseVaultManually = async () => {
+    try {
+      await apiClient.releaseVaultManually(vaultId);
+      toast.success("Vault released successfully");
+      loadVaultData();
+    } catch (error) {
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to release vault";
+      toast.error(errorMessage);
+    }
+  };
+
   const getPrivilegeBadge = (privilege: string) => {
     switch (privilege) {
       case "Owner":
@@ -368,6 +522,70 @@ export default function VaultDetailPage() {
     );
   }
 
+  // Show access denied page if backend blocked access
+  if (accessDenied) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50">
+        {/* Navigation */}
+        <nav className="relative container mx-auto px-6 py-6 flex items-center justify-between z-10 border-b border-slate-800/50">
+          <Link href="/" className="group">
+            <span className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
+              Eloomen
+            </span>
+          </Link>
+          <div className="flex items-center space-x-4">
+            <Link
+              href="/dashboard"
+              className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm"
+            >
+              Back to Vaults
+            </Link>
+          </div>
+        </nav>
+
+        {/* Main Content - Access Denied */}
+        <main className="container mx-auto px-6 py-12">
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-12 border border-slate-700/50 shadow-xl text-center">
+              <div className="mb-6">
+                <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-yellow-500/20 mb-4">
+                  <svg
+                    className="h-10 w-10 text-yellow-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                </div>
+                <h1 className="text-3xl font-bold text-slate-100 mb-2">
+                  🔒 Access Denied
+                </h1>
+                <p className="text-slate-400 text-lg mb-4">
+                  This vault is not accessible due to its release policy.
+                </p>
+                <p className="text-slate-500 text-sm">
+                  You will be redirected to the dashboard shortly...
+                </p>
+              </div>
+              <Link
+                href="/dashboard"
+                className="inline-block px-6 py-3 bg-indigo-500 text-white font-semibold rounded-lg hover:bg-indigo-600 transition-colors"
+              >
+                Back to Vaults
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   if (!vault || !isAuthenticated) {
     return null;
   }
@@ -377,6 +595,141 @@ export default function VaultDetailPage() {
   const canManageMembers = canEdit;
   const isOwner = vault.userPrivilege === "Owner";
   const isAdmin = vault.userPrivilege === "Admin";
+
+  // Helper function to check if vault is accessible and get access message
+  const getVaultAccessInfo = () => {
+    // Owner always has access
+    if (isOwner) {
+      return { hasAccess: true, message: null };
+    }
+
+    // If no policy, vault is accessible
+    if (!vault.policy) {
+      return { hasAccess: true, message: null };
+    }
+
+    const policy = vault.policy;
+    const now = new Date();
+
+    // Check if expired or revoked
+    if (policy.releaseStatus === "Expired") {
+      return {
+        hasAccess: false,
+        message: "This vault has expired and is no longer accessible.",
+      };
+    }
+
+    if (policy.releaseStatus === "Revoked") {
+      return {
+        hasAccess: false,
+        message: "This vault has been revoked and is no longer accessible.",
+      };
+    }
+
+    // Check if released
+    if (policy.releaseStatus === "Released") {
+      // Check if expired (for ExpiryBased)
+      if (policy.policyType === "ExpiryBased" && policy.expiresAt) {
+        const expiresAt = new Date(policy.expiresAt);
+        if (now > expiresAt) {
+          return {
+            hasAccess: false,
+            message: `This vault expired on ${expiresAt.toLocaleString()}.`,
+          };
+        }
+        return {
+          hasAccess: true,
+          message: `This vault will expire on ${expiresAt.toLocaleString()}.`,
+        };
+      }
+
+      return { hasAccess: true, message: null };
+    }
+
+    // Check if pending
+    if (policy.releaseStatus === "Pending") {
+      if (policy.policyType === "TimeBased" && policy.releaseDate) {
+        const releaseDate = new Date(policy.releaseDate);
+        return {
+          hasAccess: false,
+          message: `This vault will be released on ${releaseDate.toLocaleString()}.`,
+        };
+      }
+
+      if (policy.policyType === "ManualRelease") {
+        return {
+          hasAccess: false,
+          message: "This vault requires manual release by the owner.",
+        };
+      }
+    }
+
+    return { hasAccess: false, message: "This vault is not yet accessible." };
+  };
+
+  const accessInfo = getVaultAccessInfo();
+
+  // If vault is not accessible for non-owners, show access denied message instead of vault content
+  if (!accessInfo.hasAccess && !isOwner) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50">
+        {/* Navigation */}
+        <nav className="relative container mx-auto px-6 py-6 flex items-center justify-between z-10 border-b border-slate-800/50">
+          <Link href="/" className="group">
+            <span className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
+              Eloomen
+            </span>
+          </Link>
+          <div className="flex items-center space-x-4">
+            <Link
+              href="/dashboard"
+              className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm"
+            >
+              Back to Vaults
+            </Link>
+          </div>
+        </nav>
+
+        {/* Main Content - Access Denied */}
+        <main className="container mx-auto px-6 py-12">
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-12 border border-slate-700/50 shadow-xl text-center">
+              <div className="mb-6">
+                <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-yellow-500/20 mb-4">
+                  <svg
+                    className="h-10 w-10 text-yellow-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                </div>
+                <h1 className="text-3xl font-bold text-slate-100 mb-2">
+                  🔒 Vault Not Accessible
+                </h1>
+                <h2 className="text-xl font-semibold text-slate-300 mb-4">
+                  {vault.name}
+                </h2>
+                <p className="text-slate-400 text-lg">{accessInfo.message}</p>
+              </div>
+              <Link
+                href="/dashboard"
+                className="inline-block px-6 py-3 bg-indigo-500 text-white font-semibold rounded-lg hover:bg-indigo-600 transition-colors"
+              >
+                Back to Vaults
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50">
@@ -408,12 +761,25 @@ export default function VaultDetailPage() {
                   {vault.name}
                 </h1>
                 {getPrivilegeBadge(vault.userPrivilege || "")}
+                {/* Show manual release button if vault has ManualRelease policy and is pending */}
+                {vault?.policy?.policyType === "ManualRelease" &&
+                  vault?.policy?.releaseStatus === "Pending" &&
+                  isOwner && (
+                    <button
+                      onClick={handleReleaseVaultManually}
+                      className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors cursor-pointer border border-green-500/30"
+                      title="Manually release vault"
+                    >
+                      🔓 Release Vault
+                    </button>
+                  )}
               </div>
               {vault.description && (
                 <p className="text-slate-400 mt-2">{vault.description}</p>
               )}
             </div>
-            {canEdit && (
+            {/* Only owners can edit vault */}
+            {isOwner && (
               <button
                 onClick={() => setShowEditModal(true)}
                 className="px-4 py-2 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors cursor-pointer"
@@ -423,19 +789,22 @@ export default function VaultDetailPage() {
             )}
           </div>
 
-          {/* Tabs */}
+          {/* Tabs - Only show items tab for non-owners, all tabs for owners */}
           <div className="border-b border-slate-700/50 mb-6">
             <div className="flex space-x-6">
-              {(
-                [
-                  "items",
-                  "members",
-                  ...(canManageMembers ? ["invites", "history", "about"] : []),
-                ] as Tab[]
+              {(isOwner
+                ? [
+                    "items",
+                    "members",
+                    ...(canManageMembers
+                      ? ["invites", "history", "about"]
+                      : []),
+                  ]
+                : ["items"]
               ).map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => setActiveTab(tab as Tab)}
                   className={`px-4 py-3 font-semibold transition-colors border-b-2 cursor-pointer ${
                     activeTab === tab
                       ? "border-indigo-500 text-indigo-400"
@@ -453,9 +822,8 @@ export default function VaultDetailPage() {
             <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 shadow-xl">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-slate-100">Items</h2>
-                {(vault.userPrivilege === "Owner" ||
-                  vault.userPrivilege === "Admin" ||
-                  vault.userPrivilege === "Member") && (
+                {/* Only owners can add items - vault-level policy is superior */}
+                {accessInfo.hasAccess && isOwner && (
                   <button
                     onClick={() => {
                       setEditingItem(undefined);
@@ -467,28 +835,74 @@ export default function VaultDetailPage() {
                   </button>
                 )}
               </div>
-              <VaultItemList
-                items={items}
-                onEdit={(item) => {
-                  setEditingItem(item);
-                  setShowItemModal(true);
-                }}
-                onDelete={(item) => {
-                  setDeletingItem(item);
-                  setShowDeleteModal(true);
-                }}
-                onView={async (item) => {
-                  try {
-                    // Fetch full item with decrypted data
-                    const fullItem = await apiClient.getVaultItem(vaultId, item.id);
-                    setViewingItem(fullItem);
-                    setShowViewModal(true);
-                  } catch (error: any) {
-                    toast.error(error.message || "Failed to load item");
-                  }
-                }}
-                canView={true}
-              />
+              {!accessInfo.hasAccess ? (
+                <div className="text-center py-12">
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-6 mb-4">
+                    <p className="text-yellow-400 font-semibold text-lg mb-2">
+                      🔒 Vault Not Accessible
+                    </p>
+                    <p className="text-slate-300">{accessInfo.message}</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {accessInfo.message && (
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
+                      <p className="text-blue-400 text-sm">
+                        {accessInfo.message}
+                      </p>
+                    </div>
+                  )}
+                  {items.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-slate-400 text-lg mb-4">
+                        No items in this vault yet
+                      </p>
+                      {isOwner && (
+                        <button
+                          onClick={() => {
+                            setEditingItem(undefined);
+                            setShowItemModal(true);
+                          }}
+                          className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                        >
+                          + Add Your First Item
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <VaultItemList
+                      items={items}
+                      onEdit={(item) => {
+                        setEditingItem(item);
+                        setShowItemModal(true);
+                      }}
+                      onDelete={(item) => {
+                        setDeletingItem(item);
+                        setShowDeleteModal(true);
+                      }}
+                      onView={async (item) => {
+                        try {
+                          // Fetch full item with decrypted data
+                          const fullItem = await apiClient.getVaultItem(
+                            vaultId,
+                            item.id
+                          );
+                          setViewingItem(fullItem);
+                          setShowViewModal(true);
+                        } catch (error: unknown) {
+                          const errorMessage =
+                            error instanceof Error
+                              ? error.message
+                              : "Failed to load item";
+                          toast.error(errorMessage);
+                        }
+                      }}
+                      canView={true}
+                    />
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -498,7 +912,14 @@ export default function VaultDetailPage() {
                 <h2 className="text-2xl font-bold text-slate-100">Members</h2>
                 {canManageMembers && (
                   <button
-                    onClick={() => setShowInviteModal(true)}
+                    onClick={() => {
+                      setInviteForm({
+                        inviteeEmail: "",
+                        privilege: "Member",
+                        note: "",
+                      });
+                      setShowInviteModal(true);
+                    }}
                     className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
                   >
                     + Invite Member
@@ -513,7 +934,14 @@ export default function VaultDetailPage() {
                     </p>
                     {canManageMembers && (
                       <button
-                        onClick={() => setShowInviteModal(true)}
+                        onClick={() => {
+                          setInviteForm({
+                            inviteeEmail: "",
+                            privilege: "Member",
+                            note: "",
+                          });
+                          setShowInviteModal(true);
+                        }}
                         className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
                       >
                         + Invite Your First Member
@@ -536,60 +964,86 @@ export default function VaultDetailPage() {
                             <p className="text-slate-400 text-sm">
                               {member.userEmail}
                             </p>
+                            {/* Show vault policy status for non-owners */}
+                            {vault?.policy &&
+                              vault.ownerId !== member.userId && (
+                                <div className="mt-2 flex items-center gap-2">
+                                  <span className="text-xs text-slate-500">
+                                    Policy: {vault.policy.policyType}
+                                  </span>
+                                  {vault.policy.releaseStatus === "Pending" && (
+                                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs">
+                                      Pending Release
+                                    </span>
+                                  )}
+                                  {vault.policy.releaseStatus ===
+                                    "Released" && (
+                                    <span className="px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs">
+                                      Released
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                           </div>
                           {getPrivilegeBadge(member.privilege)}
                         </div>
-                        {canManageMembers && (
-                          <div className="flex items-center gap-2">
-                            {/* Owner can update any member except themselves */}
-                            {isOwner && member.privilege !== "Owner" && (
-                              <select
-                                value={member.privilege}
-                                onChange={(e) =>
-                                  handleUpdatePrivilege(
-                                    member.id,
-                                    e.target.value as
-                                      | "Owner"
-                                      | "Admin"
-                                      | "Member"
-                                  )
-                                }
-                                className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                              >
-                                <option value="Member">Member</option>
-                                <option value="Admin">Admin</option>
-                                <option value="Owner">Owner (Transfer)</option>
-                              </select>
-                            )}
-                            {/* Admin can update Members (promote to Admin) and Admins (demote to Member), but not Owners */}
-                            {isAdmin && member.privilege !== "Owner" && (
-                              <select
-                                value={member.privilege}
-                                onChange={(e) =>
-                                  handleUpdatePrivilege(
-                                    member.id,
-                                    e.target.value as "Admin" | "Member"
-                                  )
-                                }
-                                className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                              >
-                                <option value="Member">Member</option>
-                                <option value="Admin">Admin</option>
-                              </select>
-                            )}
-                            {canManageMembers &&
-                              (member.privilege !== "Owner" ||
-                                (isOwner &&
-                                  member.userId !== vault.ownerId)) && (
-                                <button
-                                  onClick={() => handleRemoveMember(member.id)}
-                                  className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded text-sm hover:bg-red-500/30 transition-colors cursor-pointer"
+                        <div className="flex items-center gap-2">
+                          {canManageMembers && (
+                            <>
+                              {/* Owner can update any member except themselves */}
+                              {isOwner && member.privilege !== "Owner" && (
+                                <select
+                                  value={member.privilege}
+                                  onChange={(e) =>
+                                    handleUpdatePrivilege(
+                                      member.id,
+                                      e.target.value as
+                                        | "Owner"
+                                        | "Admin"
+                                        | "Member"
+                                    )
+                                  }
+                                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                                 >
-                                  Remove
-                                </button>
+                                  <option value="Member">Member</option>
+                                  <option value="Admin">Admin</option>
+                                  <option value="Owner">
+                                    Owner (Transfer)
+                                  </option>
+                                </select>
                               )}
-                          </div>
-                        )}
+                              {/* Admin can update Members (promote to Admin) and Admins (demote to Member), but not Owners */}
+                              {isAdmin && member.privilege !== "Owner" && (
+                                <select
+                                  value={member.privilege}
+                                  onChange={(e) =>
+                                    handleUpdatePrivilege(
+                                      member.id,
+                                      e.target.value as "Admin" | "Member"
+                                    )
+                                  }
+                                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                                >
+                                  <option value="Member">Member</option>
+                                  <option value="Admin">Admin</option>
+                                </select>
+                              )}
+                              {canManageMembers &&
+                                (member.privilege !== "Owner" ||
+                                  (isOwner &&
+                                    member.userId !== vault.ownerId)) && (
+                                  <button
+                                    onClick={() =>
+                                      handleRemoveMember(member.id)
+                                    }
+                                    className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded text-sm hover:bg-red-500/30 transition-colors cursor-pointer"
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                            </>
+                          )}
+                        </div>
                       </div>
                     ))
                 )}
@@ -603,7 +1057,14 @@ export default function VaultDetailPage() {
                 <h2 className="text-2xl font-bold text-slate-100">Invites</h2>
                 {canManageMembers && (
                   <button
-                    onClick={() => setShowInviteModal(true)}
+                    onClick={() => {
+                      setInviteForm({
+                        inviteeEmail: "",
+                        privilege: "Member",
+                        note: "",
+                      });
+                      setShowInviteModal(true);
+                    }}
                     className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
                   >
                     + Create Invite
@@ -616,7 +1077,14 @@ export default function VaultDetailPage() {
                     <p className="text-slate-400 mb-4">No invites yet</p>
                     {canManageMembers && (
                       <button
-                        onClick={() => setShowInviteModal(true)}
+                        onClick={() => {
+                          setInviteForm({
+                            inviteeEmail: "",
+                            privilege: "Member",
+                            note: "",
+                          });
+                          setShowInviteModal(true);
+                        }}
                         className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
                       >
                         + Create Your First Invite
@@ -887,7 +1355,7 @@ export default function VaultDetailPage() {
                   className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
-              <div className="mb-6">
+              <div className="mb-4">
                 <label className="block text-sm font-semibold text-slate-300 mb-2">
                   Description
                 </label>
@@ -900,6 +1368,88 @@ export default function VaultDetailPage() {
                   className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                 />
               </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                  Release Policy *
+                </label>
+                <select
+                  value={editForm.policyType || "Immediate"}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      policyType: e.target
+                        .value as CreateVaultRequest["policyType"],
+                      releaseDate: undefined,
+                      expiresAt: undefined,
+                    })
+                  }
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  <option value="Immediate">Immediate Release</option>
+                  <option value="TimeBased">Time-Based Release</option>
+                  <option value="ExpiryBased">Expiry-Based</option>
+                  <option value="ManualRelease">Manual Release</option>
+                </select>
+              </div>
+
+              {/* Time-Based Policy Configuration */}
+              {editForm.policyType === "TimeBased" && (
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-slate-300 mb-2">
+                    Release Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={
+                      editForm.releaseDate
+                        ? new Date(editForm.releaseDate).toISOString().slice(0, 10)
+                        : ""
+                    }
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        releaseDate: e.target.value
+                          ? new Date(e.target.value + "T00:00:00Z").toISOString()
+                          : undefined,
+                      })
+                    }
+                    min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
+                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+              )}
+
+              {/* Expiry-Based Policy Configuration */}
+              {editForm.policyType === "ExpiryBased" && (
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-slate-300 mb-2">
+                    Expires At *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={
+                      editForm.expiresAt
+                        ? new Date(editForm.expiresAt).toISOString().slice(0, 10)
+                        : ""
+                    }
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        expiresAt: e.target.value
+                          ? new Date(e.target.value + "T00:00:00Z").toISOString()
+                          : undefined,
+                      })
+                    }
+                    min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
+                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+              )}
+
+              <div className="mb-6"></div>
               <div className="flex space-x-3">
                 <button
                   type="button"
@@ -923,7 +1473,7 @@ export default function VaultDetailPage() {
       {/* Create Invite Modal */}
       {showInviteModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl p-8 max-w-md w-full border border-slate-700/50 shadow-2xl">
+          <div className="bg-slate-800 rounded-2xl p-8 max-w-md w-full border border-slate-700/50 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-slate-100 mb-6">
               Invite Member
             </h2>
@@ -971,23 +1521,33 @@ export default function VaultDetailPage() {
                   </p>
                 )}
               </div>
+              {/* Invite Expiration */}
               <div className="mb-4">
                 <label className="block text-sm font-semibold text-slate-300 mb-2">
-                  Invite Type *
+                  Invite Expires At (Optional)
                 </label>
-                <select
-                  value={inviteForm.inviteType}
+                <input
+                  type="date"
+                  value={
+                    inviteForm.inviteExpiresAt
+                      ? new Date(inviteForm.inviteExpiresAt).toISOString().slice(0, 10)
+                      : ""
+                  }
                   onChange={(e) =>
                     setInviteForm({
                       ...inviteForm,
-                      inviteType: e.target.value as "Immediate" | "Delayed",
+                      inviteExpiresAt: e.target.value
+                        ? new Date(e.target.value + "T00:00:00Z").toISOString()
+                        : undefined,
                     })
                   }
+                  min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
                   className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                >
-                  <option value="Immediate">Immediate</option>
-                  <option value="Delayed">Delayed</option>
-                </select>
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  When the invite itself expires (default: 7 days). Note: The
+                  vault&apos;s release policy applies to all members.
+                </p>
               </div>
               <div className="mb-6">
                 <label className="block text-sm font-semibold text-slate-300 mb-2">
@@ -1006,7 +1566,15 @@ export default function VaultDetailPage() {
               <div className="flex space-x-3">
                 <button
                   type="button"
-                  onClick={() => setShowInviteModal(false)}
+                  onClick={() => {
+                    setShowInviteModal(false);
+                    // Reset form to defaults when closing
+                    setInviteForm({
+                      inviteeEmail: "",
+                      privilege: "Member",
+                      note: "",
+                    });
+                  }}
                   className="flex-1 px-4 py-3 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors cursor-pointer"
                 >
                   Cancel
@@ -1171,8 +1739,10 @@ export default function VaultDetailPage() {
             setShowDeleteModal(false);
             setDeletingItem(null);
             loadVaultData();
-          } catch (error: any) {
-            toast.error(error.message || "Failed to delete item");
+          } catch (error: unknown) {
+            const errorMessage =
+              error instanceof Error ? error.message : "Failed to delete item";
+            toast.error(errorMessage);
           } finally {
             setDeleting(false);
           }
@@ -1195,12 +1765,19 @@ export default function VaultDetailPage() {
           if (viewingItem) {
             try {
               // Fetch full item data with decrypted content
-              const fullItem = await apiClient.getVaultItem(vaultId, viewingItem.id);
+              const fullItem = await apiClient.getVaultItem(
+                vaultId,
+                viewingItem.id
+              );
               setEditingItem(fullItem);
               setShowViewModal(false);
               setShowItemModal(true);
-            } catch (error: any) {
-              toast.error(error.message || "Failed to load item for editing");
+            } catch (error: unknown) {
+              const errorMessage =
+                error instanceof Error
+                  ? error.message
+                  : "Failed to load item for editing";
+              toast.error(errorMessage);
             }
           }
         }}
@@ -1212,6 +1789,7 @@ export default function VaultDetailPage() {
           }
         }}
         canEdit={
+          vault &&
           (vault.userPrivilege === "Owner" ||
             vault.userPrivilege === "Admin" ||
             vault.userPrivilege === "Member") &&

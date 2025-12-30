@@ -17,5 +17,6 @@ public class VaultResponseDTO
     public DateTime CreatedAt { get; set; }
     public DateTime? DeletedAt { get; set; }
     public Privilege? UserPrivilege { get; set; }
+    public VaultPolicyResponseDTO? Policy { get; set; }
 }
 
