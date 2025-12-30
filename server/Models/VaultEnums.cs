@@ -35,3 +35,36 @@ public enum MemberStatus
     Removed = 2
 }
 
+public enum ItemType
+{
+    Document = 0,
+    Password = 1,
+    Note = 2,
+    Link = 3,
+    CryptoWallet = 4
+}
+
+public enum ItemStatus
+{
+    Active = 0,
+    Deleted = 1
+}
+
+public enum ItemPermission
+{
+    View = 0,
+    Edit = 1
+}
+
+public enum WalletType
+{
+    SeedPhrase = 0,
+    PrivateKey = 1,
+    ExchangeLogin = 2
+}
+
+public enum ContentFormat
+{
+    PlainText = 0
+}
+

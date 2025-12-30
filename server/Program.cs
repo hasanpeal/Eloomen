@@ -218,6 +218,9 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IVaultService, VaultService>();
+builder.Services.AddScoped<IEncryptionService, EncryptionService>();
+builder.Services.AddScoped<ICloudflareR2Service, CloudflareR2Service>();
+builder.Services.AddScoped<IVaultItemService, VaultItemService>();
 
 var app = builder.Build();
 

@@ -9,15 +9,20 @@ import {
   Vault,
   VaultMember,
   VaultInvite,
+  VaultItem,
   CreateInviteRequest,
   SessionExpiredError,
 } from "../../lib/api";
 import toast from "react-hot-toast";
+import VaultItemList from "../../components/VaultItemList";
+import CreateVaultItemModal from "../../components/CreateVaultItemModal";
+import DeleteItemModal from "../../components/DeleteItemModal";
+import ViewItemModal from "../../components/ViewItemModal";
 
-type Tab = "overview" | "members" | "invites" | "history" | "about";
+type Tab = "items" | "members" | "invites" | "history" | "about";
 
 export default function VaultDetailPage() {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, user } = useAuth();
   const router = useRouter();
   const params = useParams();
   const vaultId = parseInt(params.id as string);
@@ -25,8 +30,16 @@ export default function VaultDetailPage() {
   const [vault, setVault] = useState<Vault | null>(null);
   const [members, setMembers] = useState<VaultMember[]>([]);
   const [invites, setInvites] = useState<VaultInvite[]>([]);
+  const [items, setItems] = useState<VaultItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [activeTab, setActiveTab] = useState<Tab>("items");
+  const [showItemModal, setShowItemModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<VaultItem | undefined>();
+  const [deletingItem, setDeletingItem] = useState<VaultItem | null>(null);
+  const [viewingItem, setViewingItem] = useState<VaultItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
@@ -51,14 +64,16 @@ export default function VaultDetailPage() {
   const loadVaultData = useCallback(async () => {
     try {
       setLoading(true);
-      const [vaultData, membersData, invitesData] = await Promise.all([
+      const [vaultData, membersData, invitesData, itemsData] = await Promise.all([
         apiClient.getVault(vaultId),
         apiClient.getVaultMembers(vaultId),
         apiClient.getVaultInvites(vaultId),
+        apiClient.getVaultItems(vaultId).catch(() => []), // Don't fail if items fail to load
       ]);
       setVault(vaultData);
       setMembers(membersData || []);
       setInvites(invitesData || []);
+      setItems(itemsData || []);
       setEditForm({
         name: vaultData.name,
         description: vaultData.description || "",
@@ -413,7 +428,7 @@ export default function VaultDetailPage() {
             <div className="flex space-x-6">
               {(
                 [
-                  "overview",
+                  "items",
                   "members",
                   ...(canManageMembers ? ["invites", "history", "about"] : []),
                 ] as Tab[]
@@ -434,53 +449,46 @@ export default function VaultDetailPage() {
           </div>
 
           {/* Tab Content */}
-          {activeTab === "overview" && (
+          {activeTab === "items" && (
             <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 shadow-xl">
-              <h2 className="text-2xl font-bold text-slate-100 mb-6">
-                Vault Overview
-              </h2>
-              <div
-                className={`grid grid-cols-1 ${
-                  canManageMembers ? "md:grid-cols-3" : "md:grid-cols-2"
-                } gap-6 mb-6`}
-              >
-                <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
-                  <p className="text-slate-400 text-sm mb-1">Total Members</p>
-                  <p className="text-2xl font-bold text-slate-100">
-                    {members.filter((m) => m.status === "Active").length}
-                  </p>
-                </div>
-                {canManageMembers && (
-                  <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
-                    <p className="text-slate-400 text-sm mb-1">
-                      Pending Invites
-                    </p>
-                    <p className="text-2xl font-bold text-slate-100">
-                      {
-                        invites.filter(
-                          (i) => i.status === "Pending" || i.status === "Sent"
-                        ).length
-                      }
-                    </p>
-                  </div>
-                )}
-                <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
-                  <p className="text-slate-400 text-sm mb-1">Created</p>
-                  <p className="text-sm font-semibold text-slate-100">
-                    {new Date(vault.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              {vault.userPrivilege !== "Owner" && (
-                <div className="mt-6 pt-6 border-t border-slate-700/50">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-slate-100">Items</h2>
+                {(vault.userPrivilege === "Owner" ||
+                  vault.userPrivilege === "Admin" ||
+                  vault.userPrivilege === "Member") && (
                   <button
-                    onClick={() => setShowLeaveModal(true)}
-                    className="px-4 py-2 bg-red-500/20 text-red-400 font-semibold rounded-lg hover:bg-red-500/30 transition-colors border border-red-500/30 cursor-pointer"
+                    onClick={() => {
+                      setEditingItem(undefined);
+                      setShowItemModal(true);
+                    }}
+                    className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer"
                   >
-                    Leave Vault
+                    + Add Item
                   </button>
-                </div>
-              )}
+                )}
+              </div>
+              <VaultItemList
+                items={items}
+                onEdit={(item) => {
+                  setEditingItem(item);
+                  setShowItemModal(true);
+                }}
+                onDelete={(item) => {
+                  setDeletingItem(item);
+                  setShowDeleteModal(true);
+                }}
+                onView={async (item) => {
+                  try {
+                    // Fetch full item with decrypted data
+                    const fullItem = await apiClient.getVaultItem(vaultId, item.id);
+                    setViewingItem(fullItem);
+                    setShowViewModal(true);
+                  } catch (error: any) {
+                    toast.error(error.message || "Failed to load item");
+                  }
+                }}
+                canView={true}
+              />
             </div>
           )}
 
@@ -1131,6 +1139,85 @@ export default function VaultDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Create/Edit Item Modal */}
+      <CreateVaultItemModal
+        isOpen={showItemModal}
+        onClose={() => {
+          setShowItemModal(false);
+          setEditingItem(undefined);
+        }}
+        vaultId={vaultId}
+        members={members.filter((m) => m.status === "Active")}
+        onSuccess={loadVaultData}
+        editingItem={editingItem}
+        currentUserEmail={user?.email}
+      />
+
+      {/* Delete Item Modal */}
+      <DeleteItemModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setDeletingItem(null);
+          setDeleting(false);
+        }}
+        onConfirm={async () => {
+          if (!deletingItem) return;
+          setDeleting(true);
+          try {
+            await apiClient.deleteVaultItem(vaultId, deletingItem.id);
+            toast.success("Item deleted successfully");
+            setShowDeleteModal(false);
+            setDeletingItem(null);
+            loadVaultData();
+          } catch (error: any) {
+            toast.error(error.message || "Failed to delete item");
+          } finally {
+            setDeleting(false);
+          }
+        }}
+        itemTitle={deletingItem?.title || ""}
+        itemType={deletingItem?.itemType || ""}
+        loading={deleting}
+      />
+
+      {/* View Item Modal */}
+      <ViewItemModal
+        isOpen={showViewModal}
+        onClose={() => {
+          setShowViewModal(false);
+          setViewingItem(null);
+        }}
+        item={viewingItem}
+        vaultId={vaultId}
+        onEdit={async () => {
+          if (viewingItem) {
+            try {
+              // Fetch full item data with decrypted content
+              const fullItem = await apiClient.getVaultItem(vaultId, viewingItem.id);
+              setEditingItem(fullItem);
+              setShowViewModal(false);
+              setShowItemModal(true);
+            } catch (error: any) {
+              toast.error(error.message || "Failed to load item for editing");
+            }
+          }
+        }}
+        onDelete={() => {
+          if (viewingItem) {
+            setDeletingItem(viewingItem);
+            setShowViewModal(false);
+            setShowDeleteModal(true);
+          }
+        }}
+        canEdit={
+          (vault.userPrivilege === "Owner" ||
+            vault.userPrivilege === "Admin" ||
+            vault.userPrivilege === "Member") &&
+          viewingItem?.userPermission === "Edit"
+        }
+      />
     </div>
   );
 }

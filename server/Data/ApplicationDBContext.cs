@@ -17,6 +17,13 @@ public class ApplicationDBContext : IdentityDbContext<User>
     public DbSet<Vault> Vaults { get; set; }
     public DbSet<VaultInvite> VaultInvites { get; set; }
     public DbSet<VaultMember> VaultMembers { get; set; }
+    public DbSet<VaultItem> VaultItems { get; set; }
+    public DbSet<VaultItemVisibility> VaultItemVisibilities { get; set; }
+    public DbSet<VaultDocument> VaultDocuments { get; set; }
+    public DbSet<VaultPassword> VaultPasswords { get; set; }
+    public DbSet<VaultNote> VaultNotes { get; set; }
+    public DbSet<VaultLink> VaultLinks { get; set; }
+    public DbSet<VaultCryptoWallet> VaultCryptoWallets { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -173,6 +180,142 @@ public class ApplicationDBContext : IdentityDbContext<User>
                 .WithMany()
                 .HasForeignKey(e => e.RemovedById)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // VaultItems configuration
+        builder.Entity<VaultItem>(entity =>
+        {
+            entity.ToTable("VaultItems");
+            entity.HasIndex(e => e.VaultId);
+            entity.HasIndex(e => e.CreatedByUserId);
+            entity.HasIndex(e => e.ItemType);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.DeletedAt);
+            
+            entity.HasOne(e => e.Vault)
+                .WithMany(e => e.Items)
+                .HasForeignKey(e => e.VaultId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+            
+            entity.HasOne(e => e.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired();
+            
+            entity.HasOne(e => e.DeletedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.DeletedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+            
+            // One-to-one relationships with specific item types
+            entity.HasOne(e => e.Document)
+                .WithOne(e => e.VaultItem)
+                .HasForeignKey<VaultDocument>(e => e.VaultItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.Password)
+                .WithOne(e => e.VaultItem)
+                .HasForeignKey<VaultPassword>(e => e.VaultItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.Note)
+                .WithOne(e => e.VaultItem)
+                .HasForeignKey<VaultNote>(e => e.VaultItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.Link)
+                .WithOne(e => e.VaultItem)
+                .HasForeignKey<VaultLink>(e => e.VaultItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.CryptoWallet)
+                .WithOne(e => e.VaultItem)
+                .HasForeignKey<VaultCryptoWallet>(e => e.VaultItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // VaultItemVisibilities configuration
+        builder.Entity<VaultItemVisibility>(entity =>
+        {
+            entity.ToTable("VaultItemVisibilities");
+            entity.HasIndex(e => e.VaultItemId);
+            entity.HasIndex(e => e.VaultMemberId);
+            entity.HasIndex(e => new { e.VaultItemId, e.VaultMemberId }).IsUnique();
+            
+            entity.HasOne(e => e.VaultItem)
+                .WithMany(e => e.Visibilities)
+                .HasForeignKey(e => e.VaultItemId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+            
+            entity.HasOne(e => e.VaultMember)
+                .WithMany()
+                .HasForeignKey(e => e.VaultMemberId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+        });
+
+        // VaultDocuments configuration
+        builder.Entity<VaultDocument>(entity =>
+        {
+            entity.ToTable("VaultDocuments");
+            entity.HasIndex(e => e.ObjectKey);
+            
+            entity.HasOne(e => e.VaultItem)
+                .WithOne(e => e.Document)
+                .HasForeignKey<VaultDocument>(e => e.VaultItemId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+        });
+
+        // VaultPasswords configuration
+        builder.Entity<VaultPassword>(entity =>
+        {
+            entity.ToTable("VaultPasswords");
+            
+            entity.HasOne(e => e.VaultItem)
+                .WithOne(e => e.Password)
+                .HasForeignKey<VaultPassword>(e => e.VaultItemId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+        });
+
+        // VaultNotes configuration
+        builder.Entity<VaultNote>(entity =>
+        {
+            entity.ToTable("VaultNotes");
+            
+            entity.HasOne(e => e.VaultItem)
+                .WithOne(e => e.Note)
+                .HasForeignKey<VaultNote>(e => e.VaultItemId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+        });
+
+        // VaultLinks configuration
+        builder.Entity<VaultLink>(entity =>
+        {
+            entity.ToTable("VaultLinks");
+            
+            entity.HasOne(e => e.VaultItem)
+                .WithOne(e => e.Link)
+                .HasForeignKey<VaultLink>(e => e.VaultItemId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+        });
+
+        // VaultCryptoWallets configuration
+        builder.Entity<VaultCryptoWallet>(entity =>
+        {
+            entity.ToTable("VaultCryptoWallets");
+            
+            entity.HasOne(e => e.VaultItem)
+                .WithOne(e => e.CryptoWallet)
+                .HasForeignKey<VaultCryptoWallet>(e => e.VaultItemId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
         });
     }
 

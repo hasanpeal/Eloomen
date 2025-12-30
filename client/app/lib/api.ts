@@ -540,6 +540,233 @@ class ApiClient {
       method: "POST",
     });
   }
+
+  // Vault Item API methods
+  async getVaultItems(vaultId: number): Promise<VaultItem[]> {
+    return this.request<VaultItem[]>(`/vault/${vaultId}/items`, {
+      method: "GET",
+    });
+  }
+
+  async getVaultItem(vaultId: number, itemId: number): Promise<VaultItem> {
+    return this.request<VaultItem>(`/vault/${vaultId}/items/${itemId}`, {
+      method: "GET",
+    });
+  }
+
+  async createVaultItem(
+    vaultId: number,
+    data: CreateVaultItemRequest
+  ): Promise<VaultItem> {
+    const formData = new FormData();
+    formData.append("vaultId", vaultId.toString());
+    formData.append("itemType", data.itemType);
+    formData.append("title", data.title);
+    if (data.description) formData.append("description", data.description);
+
+    // Document
+    if (data.documentFile) {
+      formData.append("documentFile", data.documentFile);
+    }
+
+    // Password
+    if (data.itemType === "Password") {
+      if (data.username) formData.append("username", data.username);
+      if (data.password) formData.append("password", data.password);
+      if (data.websiteUrl) formData.append("websiteUrl", data.websiteUrl);
+      if (data.passwordNotes)
+        formData.append("passwordNotes", data.passwordNotes);
+    }
+
+    // Note
+    if (data.itemType === "Note") {
+      if (data.noteContent) formData.append("noteContent", data.noteContent);
+      if (data.contentFormat)
+        formData.append("contentFormat", data.contentFormat);
+    }
+
+    // Link
+    if (data.itemType === "Link") {
+      if (data.url) formData.append("url", data.url);
+      if (data.linkNotes) formData.append("linkNotes", data.linkNotes);
+    }
+
+    // CryptoWallet
+    if (data.itemType === "CryptoWallet") {
+      if (data.walletType) formData.append("walletType", data.walletType);
+      if (data.platformName) formData.append("platformName", data.platformName);
+      if (data.blockchain) formData.append("blockchain", data.blockchain);
+      if (data.publicAddress)
+        formData.append("publicAddress", data.publicAddress);
+      if (data.secret) formData.append("secret", data.secret);
+      if (data.cryptoNotes) formData.append("cryptoNotes", data.cryptoNotes);
+    }
+
+    // Visibilities
+    if (data.visibilities && data.visibilities.length > 0) {
+      formData.append("visibilities", JSON.stringify(data.visibilities));
+    }
+
+    const token = this.getToken();
+    const headers: HeadersInit = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/vault/${vaultId}/items`, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorMessage = await this.getErrorMessage(response);
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
+
+  async updateVaultItem(
+    vaultId: number,
+    itemId: number,
+    data: UpdateVaultItemRequest
+  ): Promise<VaultItem> {
+    const formData = new FormData();
+    if (data.title) formData.append("title", data.title);
+    if (data.description !== undefined)
+      formData.append("description", data.description || "");
+
+    // Document
+    if (data.documentFile) {
+      formData.append("documentFile", data.documentFile);
+    }
+    if (data.deleteDocument !== undefined)
+      formData.append("deleteDocument", data.deleteDocument.toString());
+
+    // Password
+    if (data.username !== undefined)
+      formData.append("username", data.username || "");
+    if (data.password !== undefined)
+      formData.append("password", data.password || "");
+    if (data.websiteUrl !== undefined)
+      formData.append("websiteUrl", data.websiteUrl || "");
+    if (data.passwordNotes !== undefined)
+      formData.append("passwordNotes", data.passwordNotes || "");
+
+    // Note
+    if (data.noteContent !== undefined)
+      formData.append("noteContent", data.noteContent || "");
+    if (data.contentFormat)
+      formData.append("contentFormat", data.contentFormat);
+
+    // Link
+    if (data.url !== undefined) formData.append("url", data.url || "");
+    if (data.linkNotes !== undefined)
+      formData.append("linkNotes", data.linkNotes || "");
+
+    // CryptoWallet
+    if (data.walletType) formData.append("walletType", data.walletType);
+    if (data.platformName !== undefined)
+      formData.append("platformName", data.platformName || "");
+    if (data.blockchain !== undefined)
+      formData.append("blockchain", data.blockchain || "");
+    if (data.publicAddress !== undefined)
+      formData.append("publicAddress", data.publicAddress || "");
+    if (data.secret !== undefined) formData.append("secret", data.secret || "");
+    if (data.cryptoNotes !== undefined)
+      formData.append("cryptoNotes", data.cryptoNotes || "");
+
+    // Visibilities
+    if (data.visibilities && data.visibilities.length > 0) {
+      formData.append("visibilities", JSON.stringify(data.visibilities));
+    }
+
+    const token = this.getToken();
+    const headers: HeadersInit = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/vault/${vaultId}/items/${itemId}`,
+      {
+        method: "PUT",
+        headers,
+        credentials: "include",
+        body: formData,
+      }
+    );
+
+    if (!response.ok) {
+      const errorMessage = await this.getErrorMessage(response);
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
+
+  async deleteVaultItem(vaultId: number, itemId: number): Promise<void> {
+    const token = this.getToken();
+    const headers: HeadersInit = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/vault/${vaultId}/items/${itemId}`,
+      {
+        method: "DELETE",
+        headers,
+        credentials: "include",
+      }
+    );
+
+    if (!response.ok) {
+      const errorMessage = await this.getErrorMessage(response);
+      throw new Error(errorMessage);
+    }
+
+    // Handle 204 No Content (empty response)
+    if (response.status === 204) {
+      return;
+    }
+
+    // Try to parse JSON if there's content
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      await response.json();
+    }
+  }
+
+  async restoreVaultItem(
+    vaultId: number,
+    itemId: number
+  ): Promise<{ message: string }> {
+    return this.request<{ message: string }>(
+      `/vault/${vaultId}/items/${itemId}/restore`,
+      {
+        method: "POST",
+      }
+    );
+  }
+
+  private async getErrorMessage(response: Response): Promise<string> {
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      try {
+        const errorData = await response.json();
+        if (typeof errorData === "string") return errorData;
+        if (errorData.message) return errorData.message;
+        if (errorData.error) return errorData.error;
+        return `HTTP error! status: ${response.status}`;
+      } catch {
+        return `HTTP error! status: ${response.status}`;
+      }
+    }
+    return `HTTP error! status: ${response.status}`;
+  }
 }
 
 // Vault Types
@@ -627,6 +854,144 @@ export interface InviteInfo {
   isValid: boolean;
   errorMessage?: string;
   userExists: boolean;
+}
+
+// Vault Item Types
+export type ItemType =
+  | "Document"
+  | "Password"
+  | "Note"
+  | "Link"
+  | "CryptoWallet";
+export type ItemStatus = "Active" | "Deleted";
+export type ItemPermission = "View" | "Edit";
+export type WalletType = "SeedPhrase" | "PrivateKey" | "ExchangeLogin";
+export type ContentFormat = "PlainText";
+
+export interface VaultItem {
+  id: number;
+  vaultId: number;
+  createdByUserId: string;
+  createdByUserName?: string;
+  itemType: ItemType;
+  title: string;
+  description?: string;
+  status: ItemStatus;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+  deletedBy?: string;
+  document?: VaultDocument;
+  password?: VaultPassword;
+  note?: VaultNote;
+  link?: VaultLink;
+  cryptoWallet?: VaultCryptoWallet;
+  visibilities: ItemVisibility[];
+  userPermission?: ItemPermission;
+}
+
+export interface VaultDocument {
+  objectKey: string;
+  originalFileName: string;
+  contentType: string;
+  fileSize: number;
+  uploadedAt: string;
+  downloadUrl?: string;
+}
+
+export interface VaultPassword {
+  username?: string;
+  password?: string;
+  websiteUrl?: string;
+  notes?: string;
+}
+
+export interface VaultNote {
+  content: string;
+  contentFormat: ContentFormat;
+}
+
+export interface VaultLink {
+  url: string;
+  notes?: string;
+}
+
+export interface VaultCryptoWallet {
+  walletType: WalletType;
+  platformName?: string;
+  blockchain?: string;
+  publicAddress?: string;
+  secret?: string;
+  notes?: string;
+}
+
+export interface ItemVisibility {
+  id: number;
+  vaultItemId: number;
+  vaultMemberId: number;
+  memberEmail?: string;
+  memberName?: string;
+  permission: ItemPermission;
+}
+
+export interface CreateVaultItemRequest {
+  vaultId: number;
+  itemType: ItemType;
+  title: string;
+  description?: string;
+  documentFile?: File;
+  // Password fields
+  username?: string;
+  password?: string;
+  websiteUrl?: string;
+  passwordNotes?: string;
+  // Note fields
+  noteContent?: string;
+  contentFormat?: ContentFormat;
+  // Link fields
+  url?: string;
+  linkNotes?: string;
+  // CryptoWallet fields
+  walletType?: WalletType;
+  platformName?: string;
+  blockchain?: string;
+  publicAddress?: string;
+  secret?: string;
+  cryptoNotes?: string;
+  // Visibility
+  visibilities?: ItemVisibilityRequest[];
+}
+
+export interface UpdateVaultItemRequest {
+  title?: string;
+  description?: string;
+  documentFile?: File;
+  deleteDocument?: boolean;
+  // Password fields
+  username?: string;
+  password?: string;
+  websiteUrl?: string;
+  passwordNotes?: string;
+  // Note fields
+  noteContent?: string;
+  contentFormat?: ContentFormat;
+  // Link fields
+  url?: string;
+  linkNotes?: string;
+  // CryptoWallet fields
+  walletType?: WalletType;
+  platformName?: string;
+  blockchain?: string;
+  publicAddress?: string;
+  secret?: string;
+  cryptoNotes?: string;
+  // Visibility
+  visibilities?: ItemVisibilityRequest[];
+}
+
+export interface ItemVisibilityRequest {
+  vaultMemberId: number;
+  permission: ItemPermission;
 }
 
 export const apiClient = new ApiClient();
