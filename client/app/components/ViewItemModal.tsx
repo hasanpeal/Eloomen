@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { VaultItem, apiClient } from "../lib/api";
+import { FileText, Key, StickyNote, Link as LinkIcon, Wallet, Package, X } from "lucide-react";
 
 interface ViewItemModalProps {
   isOpen: boolean;
@@ -49,19 +50,20 @@ export default function ViewItemModal({
   const displayItem = fullItem || item;
 
   const getItemIcon = (itemType: string) => {
+    const iconClass = "w-8 h-8 text-slate-400";
     switch (itemType) {
       case "Document":
-        return "📄";
+        return <FileText className={iconClass} />;
       case "Password":
-        return "🔑";
+        return <Key className={iconClass} />;
       case "Note":
-        return "📝";
+        return <StickyNote className={iconClass} />;
       case "Link":
-        return "🔗";
+        return <LinkIcon className={iconClass} />;
       case "CryptoWallet":
-        return "₿";
+        return <Wallet className={iconClass} />;
       default:
-        return "📦";
+        return <Package className={iconClass} />;
     }
   };
 
@@ -91,12 +93,12 @@ export default function ViewItemModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-700/50 shadow-2xl">
+      <div className="bg-slate-800 rounded-2xl p-4 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-700/50 shadow-2xl">
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">{getItemIcon(displayItem.itemType)}</span>
-            <div>
-              <h2 className="text-2xl font-bold text-slate-100">{displayItem.title}</h2>
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="flex-shrink-0">{getItemIcon(displayItem.itemType)}</div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl md:text-2xl font-bold text-slate-100 truncate">{displayItem.title}</h2>
               <p className="text-sm text-slate-400 capitalize">{displayItem.itemType}</p>
             </div>
           </div>
@@ -105,11 +107,9 @@ export default function ViewItemModal({
           )}
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 transition-colors"
+            className="text-slate-400 hover:text-slate-200 transition-colors flex-shrink-0 ml-2"
           >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-6 h-6" />
           </button>
         </div>
 

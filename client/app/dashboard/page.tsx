@@ -4,8 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../contexts/AuthContext";
-import { apiClient, Vault, CreateVaultRequest, SessionExpiredError } from "../lib/api";
+import {
+  apiClient,
+  Vault,
+  CreateVaultRequest,
+  SessionExpiredError,
+} from "../lib/api";
 import toast from "react-hot-toast";
+import { Plus, Menu, X, Lock, Crown, ShieldCheck, User } from "lucide-react";
 
 export default function DashboardPage() {
   const { isLoading, isAuthenticated, user, logout } = useAuth();
@@ -18,6 +24,7 @@ export default function DashboardPage() {
   const [accessDeniedVault, setAccessDeniedVault] = useState<Vault | null>(
     null
   );
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [createForm, setCreateForm] = useState<CreateVaultRequest>({
     name: "",
     description: "",
@@ -104,7 +111,7 @@ export default function DashboardPage() {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          <p className="mt-4 text-slate-400">Loading vaults...</p>
+          <p className="mt-4 text-slate-400">Loading vaults</p>
         </div>
       </div>
     );
@@ -118,20 +125,23 @@ export default function DashboardPage() {
     switch (privilege) {
       case "Owner":
         return (
-          <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs font-semibold border border-yellow-500/30">
-            👑 Owner
+          <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs font-semibold border border-yellow-500/30 flex items-center gap-1.5">
+            <Crown className="w-3 h-3" />
+            Owner
           </span>
         );
       case "Admin":
         return (
-          <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-semibold border border-blue-500/30">
-            🛠 Admin
+          <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-semibold border border-blue-500/30 flex items-center gap-1.5">
+            <ShieldCheck className="w-3 h-3" />
+            Admin
           </span>
         );
       case "Member":
         return (
-          <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold border border-green-500/30">
-            👀 Member
+          <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold border border-green-500/30 flex items-center gap-1.5">
+            <User className="w-3 h-3" />
+            Member
           </span>
         );
       default:
@@ -227,11 +237,13 @@ export default function DashboardPage() {
       {/* Navigation */}
       <nav className="relative container mx-auto px-6 py-6 flex items-center justify-between z-10 border-b border-slate-800/50">
         <Link href="/" className="group">
-          <span className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
+          <span className="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
             Eloomen
           </span>
         </Link>
-        <div className="flex items-center space-x-4">
+
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex items-center space-x-4">
           <button
             onClick={() => setShowAccountModal(true)}
             className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
@@ -245,6 +257,45 @@ export default function DashboardPage() {
             Logout
           </button>
         </div>
+
+        {/* Mobile Menu Button */}
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="md:hidden p-2 text-slate-300 hover:text-indigo-400 transition-colors"
+          aria-label="Toggle menu"
+        >
+          {isMobileMenuOpen ? (
+            <X className="w-6 h-6" />
+          ) : (
+            <Menu className="w-6 h-6" />
+          )}
+        </button>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="absolute top-full left-0 right-0 mt-2 mx-6 bg-slate-800/95 backdrop-blur-md rounded-xl border border-slate-700/50 shadow-2xl md:hidden z-50">
+            <div className="flex flex-col p-4 space-y-2">
+              <button
+                onClick={() => {
+                  setShowAccountModal(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="px-5 py-3 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-700/50 cursor-pointer text-left"
+              >
+                Account
+              </button>
+              <button
+                onClick={() => {
+                  handleLogout();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="px-5 py-3 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-700/50 cursor-pointer text-left"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Main Content */}
@@ -252,18 +303,19 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-4xl font-bold text-slate-100 mb-2">
+              <h1 className="text-2xl md:text-4xl font-bold text-slate-100 mb-2">
                 Your Vaults
               </h1>
-              <p className="text-slate-400">
+              <p className="hidden md:block text-slate-400">
                 Manage your secure vaults and collaborate with others
               </p>
             </div>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 shadow-lg shadow-indigo-500/20 cursor-pointer"
+              className="px-4 md:px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer flex items-center gap-2"
             >
-              + Create Vault
+              <Plus className="w-5 h-5" />
+              <span className="hidden md:inline">Create Vault</span>
             </button>
           </div>
 
@@ -274,8 +326,9 @@ export default function DashboardPage() {
               </p>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer flex items-center justify-center gap-2"
               >
+                <Plus className="w-5 h-5" />
                 Create Your First Vault
               </button>
             </div>
@@ -327,9 +380,12 @@ export default function DashboardPage() {
                       )}
                       {accessInfo.message && (
                         <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                          <p className="text-yellow-400 text-xs font-semibold">
-                            🔒 {accessInfo.message}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <Lock className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                            <p className="text-yellow-400 text-xs font-semibold">
+                              {accessInfo.message}
+                            </p>
+                          </div>
                         </div>
                       )}
                       <div className="flex items-center justify-between text-xs text-slate-500">
@@ -540,7 +596,7 @@ export default function DashboardPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                  className="flex-1 px-4 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer"
                 >
                   Create
                 </button>
@@ -570,9 +626,12 @@ export default function DashboardPage() {
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-slate-100 mb-2 text-center">
-                🔒 Vault Not Accessible
-              </h2>
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <Lock className="w-6 h-6 text-yellow-400" />
+                <h2 className="text-xl md:text-2xl font-bold text-slate-100">
+                  Vault Not Accessible
+                </h2>
+              </div>
               <h3 className="text-xl font-semibold text-slate-300 mb-4 text-center">
                 {accessDeniedVault.name}
               </h3>

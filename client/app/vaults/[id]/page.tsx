@@ -19,6 +19,17 @@ import VaultItemList from "../../components/VaultItemList";
 import CreateVaultItemModal from "../../components/CreateVaultItemModal";
 import DeleteItemModal from "../../components/DeleteItemModal";
 import ViewItemModal from "../../components/ViewItemModal";
+import {
+  Plus,
+  ChevronDown,
+  ArrowLeft,
+  Lock,
+  Unlock,
+  AlertTriangle,
+  Crown,
+  ShieldCheck,
+  User,
+} from "lucide-react";
 
 type Tab = "items" | "members" | "invites" | "history" | "about";
 
@@ -49,6 +60,7 @@ export default function VaultDetailPage() {
   const [transferMember, setTransferMember] = useState<VaultMember | null>(
     null
   );
+  const [isTabDropdownOpen, setIsTabDropdownOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState<CreateInviteRequest>({
     inviteeEmail: "",
     privilege: "Member",
@@ -429,20 +441,23 @@ export default function VaultDetailPage() {
     switch (privilege) {
       case "Owner":
         return (
-          <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs font-semibold border border-yellow-500/30">
-            👑 Owner
+          <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs font-semibold border border-yellow-500/30 flex items-center gap-1.5">
+            <Crown className="w-3 h-3" />
+            Owner
           </span>
         );
       case "Admin":
         return (
-          <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-semibold border border-blue-500/30">
-            🛠 Admin
+          <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-semibold border border-blue-500/30 flex items-center gap-1.5">
+            <ShieldCheck className="w-3 h-3" />
+            Admin
           </span>
         );
       case "Member":
         return (
-          <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold border border-green-500/30">
-            👀 Member
+          <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold border border-green-500/30 flex items-center gap-1.5">
+            <User className="w-3 h-3" />
+            Member
           </span>
         );
       default:
@@ -529,16 +544,17 @@ export default function VaultDetailPage() {
         {/* Navigation */}
         <nav className="relative container mx-auto px-6 py-6 flex items-center justify-between z-10 border-b border-slate-800/50">
           <Link href="/" className="group">
-            <span className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
+            <span className="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
               Eloomen
             </span>
           </Link>
           <div className="flex items-center space-x-4">
             <Link
               href="/dashboard"
-              className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm"
+              className="px-3 py-2 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm flex items-center gap-2"
             >
-              Back to Vaults
+              <ArrowLeft className="w-5 h-5" />
+              <span className="hidden sm:inline">Back</span>
             </Link>
           </div>
         </nav>
@@ -563,9 +579,12 @@ export default function VaultDetailPage() {
                     />
                   </svg>
                 </div>
-                <h1 className="text-3xl font-bold text-slate-100 mb-2">
-                  🔒 Access Denied
-                </h1>
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <Lock className="w-8 h-8 text-yellow-400" />
+                  <h1 className="text-2xl md:text-3xl font-bold text-slate-100">
+                    Access Denied
+                  </h1>
+                </div>
                 <p className="text-slate-400 text-lg mb-4">
                   This vault is not accessible due to its release policy.
                 </p>
@@ -575,9 +594,10 @@ export default function VaultDetailPage() {
               </div>
               <Link
                 href="/dashboard"
-                className="inline-block px-6 py-3 bg-indigo-500 text-white font-semibold rounded-lg hover:bg-indigo-600 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-500 text-white font-semibold rounded-lg hover:bg-indigo-600 transition-colors"
               >
-                Back to Vaults
+                <ArrowLeft className="w-5 h-5" />
+                Back
               </Link>
             </div>
           </div>
@@ -676,16 +696,17 @@ export default function VaultDetailPage() {
         {/* Navigation */}
         <nav className="relative container mx-auto px-6 py-6 flex items-center justify-between z-10 border-b border-slate-800/50">
           <Link href="/" className="group">
-            <span className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
+            <span className="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
               Eloomen
             </span>
           </Link>
           <div className="flex items-center space-x-4">
             <Link
               href="/dashboard"
-              className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm"
+              className="px-3 py-2 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm flex items-center gap-2"
             >
-              Back to Vaults
+              <ArrowLeft className="w-5 h-5" />
+              <span className="hidden sm:inline">Back</span>
             </Link>
           </div>
         </nav>
@@ -710,9 +731,12 @@ export default function VaultDetailPage() {
                     />
                   </svg>
                 </div>
-                <h1 className="text-3xl font-bold text-slate-100 mb-2">
-                  🔒 Vault Not Accessible
-                </h1>
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <Lock className="w-8 h-8 text-yellow-400" />
+                  <h1 className="text-2xl md:text-3xl font-bold text-slate-100">
+                    Vault Not Accessible
+                  </h1>
+                </div>
                 <h2 className="text-xl font-semibold text-slate-300 mb-4">
                   {vault.name}
                 </h2>
@@ -720,9 +744,10 @@ export default function VaultDetailPage() {
               </div>
               <Link
                 href="/dashboard"
-                className="inline-block px-6 py-3 bg-indigo-500 text-white font-semibold rounded-lg hover:bg-indigo-600 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-500 text-white font-semibold rounded-lg hover:bg-indigo-600 transition-colors"
               >
-                Back to Vaults
+                <ArrowLeft className="w-5 h-5" />
+                Back
               </Link>
             </div>
           </div>
@@ -734,30 +759,31 @@ export default function VaultDetailPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50">
       {/* Navigation */}
-      <nav className="relative container mx-auto px-6 py-6 flex items-center justify-between z-10 border-b border-slate-800/50">
+      <nav className="relative container mx-auto px-4 sm:px-6 py-4 sm:py-6 flex items-center justify-between z-10 border-b border-slate-800/50">
         <Link href="/" className="group">
-          <span className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
+          <span className="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
             Eloomen
           </span>
         </Link>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 sm:space-x-4">
           <Link
             href="/dashboard"
-            className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm"
+            className="px-2 sm:px-3 py-1.5 sm:py-2 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm flex items-center gap-1.5 sm:gap-2"
           >
-            Back to Vaults
+            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">Back</span>
           </Link>
         </div>
       </nav>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-12">
+      <main className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="flex items-start justify-between mb-8">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-4xl font-bold text-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 md:mb-8">
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                <h1 className="text-xl md:text-3xl lg:text-4xl font-bold text-slate-100 break-words">
                   {vault.name}
                 </h1>
                 {getPrivilegeBadge(vault.userPrivilege || "")}
@@ -767,22 +793,26 @@ export default function VaultDetailPage() {
                   isOwner && (
                     <button
                       onClick={handleReleaseVaultManually}
-                      className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors cursor-pointer border border-green-500/30"
+                      className="px-3 sm:px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors cursor-pointer border border-green-500/30 flex items-center gap-2 text-sm sm:text-base"
                       title="Manually release vault"
                     >
-                      🔓 Release Vault
+                      <Unlock className="w-4 h-4" />
+                      <span className="hidden sm:inline">Release Vault</span>
+                      <span className="sm:hidden">Release</span>
                     </button>
                   )}
               </div>
               {vault.description && (
-                <p className="text-slate-400 mt-2">{vault.description}</p>
+                <p className="text-slate-400 mt-2 text-sm sm:text-base">
+                  {vault.description}
+                </p>
               )}
             </div>
             {/* Only owners can edit vault */}
             {isOwner && (
               <button
                 onClick={() => setShowEditModal(true)}
-                className="px-4 py-2 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors cursor-pointer"
+                className="px-3 sm:px-4 py-2 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors cursor-pointer text-sm sm:text-base whitespace-nowrap"
               >
                 Edit Vault
               </button>
@@ -791,7 +821,8 @@ export default function VaultDetailPage() {
 
           {/* Tabs - Only show items tab for non-owners, all tabs for owners */}
           <div className="border-b border-slate-700/50 mb-6">
-            <div className="flex space-x-6">
+            {/* Desktop Tabs */}
+            <div className="hidden md:flex space-x-6">
               {(isOwner
                 ? [
                     "items",
@@ -815,13 +846,64 @@ export default function VaultDetailPage() {
                 </button>
               ))}
             </div>
+
+            {/* Mobile Tab Dropdown */}
+            <div className="md:hidden relative">
+              <button
+                onClick={() => setIsTabDropdownOpen(!isTabDropdownOpen)}
+                className="w-full px-4 py-3 font-semibold text-slate-300 hover:text-indigo-400 transition-colors rounded-lg hover:bg-slate-700/50 flex items-center justify-between"
+              >
+                <span>
+                  {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                </span>
+                <ChevronDown
+                  className={`w-5 h-5 transition-transform ${
+                    isTabDropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {isTabDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800/95 backdrop-blur-md rounded-xl border border-slate-700/50 shadow-2xl z-50">
+                  <div className="flex flex-col p-2">
+                    {(isOwner
+                      ? [
+                          "items",
+                          "members",
+                          ...(canManageMembers
+                            ? ["invites", "history", "about"]
+                            : []),
+                        ]
+                      : ["items"]
+                    ).map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => {
+                          setActiveTab(tab as Tab);
+                          setIsTabDropdownOpen(false);
+                        }}
+                        className={`px-4 py-3 font-semibold transition-colors rounded-lg cursor-pointer text-left ${
+                          activeTab === tab
+                            ? "bg-indigo-600/20 text-indigo-400"
+                            : "text-slate-300 hover:bg-slate-700/50 hover:text-slate-100"
+                        }`}
+                      >
+                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Tab Content */}
           {activeTab === "items" && (
-            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 shadow-xl">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-slate-100">Items</h2>
+            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-4 md:p-8 border border-slate-700/50 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-100">
+                  Items
+                </h2>
                 {/* Only owners can add items - vault-level policy is superior */}
                 {accessInfo.hasAccess && isOwner && (
                   <button
@@ -829,18 +911,23 @@ export default function VaultDetailPage() {
                       setEditingItem(undefined);
                       setShowItemModal(true);
                     }}
-                    className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer"
+                    className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer flex items-center gap-2"
                   >
-                    + Add Item
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">Add Item</span>
+                    <span className="sm:hidden">Add</span>
                   </button>
                 )}
               </div>
               {!accessInfo.hasAccess ? (
                 <div className="text-center py-12">
                   <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-6 mb-4">
-                    <p className="text-yellow-400 font-semibold text-lg mb-2">
-                      🔒 Vault Not Accessible
-                    </p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Lock className="w-5 h-5 text-yellow-400" />
+                      <p className="text-yellow-400 font-semibold text-base md:text-lg">
+                        Vault Not Accessible
+                      </p>
+                    </div>
                     <p className="text-slate-300">{accessInfo.message}</p>
                   </div>
                 </div>
@@ -858,17 +945,6 @@ export default function VaultDetailPage() {
                       <p className="text-slate-400 text-lg mb-4">
                         No items in this vault yet
                       </p>
-                      {isOwner && (
-                        <button
-                          onClick={() => {
-                            setEditingItem(undefined);
-                            setShowItemModal(true);
-                          }}
-                          className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
-                        >
-                          + Add Your First Item
-                        </button>
-                      )}
                     </div>
                   ) : (
                     <VaultItemList
@@ -911,9 +987,11 @@ export default function VaultDetailPage() {
           )}
 
           {activeTab === "members" && (
-            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 shadow-xl">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-slate-100">Members</h2>
+            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-4 md:p-8 border border-slate-700/50 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-100">
+                  Members
+                </h2>
                 {canManageMembers && (
                   <button
                     onClick={() => {
@@ -924,9 +1002,11 @@ export default function VaultDetailPage() {
                       });
                       setShowInviteModal(true);
                     }}
-                    className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                    className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer flex items-center gap-2"
                   >
-                    + Invite Member
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">Invite Member</span>
+                    <span className="sm:hidden">Invite</span>
                   </button>
                 )}
               </div>
@@ -946,9 +1026,10 @@ export default function VaultDetailPage() {
                           });
                           setShowInviteModal(true);
                         }}
-                        className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                        className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer flex items-center justify-center gap-2"
                       >
-                        + Invite Your First Member
+                        <Plus className="w-5 h-5" />
+                        Invite Your First Member
                       </button>
                     )}
                   </div>
@@ -958,14 +1039,14 @@ export default function VaultDetailPage() {
                     .map((member) => (
                       <div
                         key={member.id}
-                        className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50 flex items-center justify-between"
+                        className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
                       >
-                        <div className="flex items-center gap-4">
-                          <div>
-                            <p className="text-slate-100 font-semibold">
+                        <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-slate-100 font-semibold text-sm sm:text-base truncate">
                               {member.userName || member.userEmail || "Unknown"}
                             </p>
-                            <p className="text-slate-400 text-sm">
+                            <p className="text-slate-400 text-xs sm:text-sm truncate">
                               {member.userEmail}
                             </p>
                             {/* Show vault policy status for non-owners */}
@@ -989,9 +1070,11 @@ export default function VaultDetailPage() {
                                 </div>
                               )}
                           </div>
-                          {getPrivilegeBadge(member.privilege)}
+                          <div className="flex-shrink-0">
+                            {getPrivilegeBadge(member.privilege)}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           {canManageMembers && (
                             <>
                               {/* Owner can update any member except themselves */}
@@ -1007,7 +1090,7 @@ export default function VaultDetailPage() {
                                         | "Member"
                                     )
                                   }
-                                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                                  className="px-2 sm:px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-100 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer flex-1 sm:flex-none min-w-[100px]"
                                 >
                                   <option value="Member">Member</option>
                                   <option value="Admin">Admin</option>
@@ -1026,7 +1109,7 @@ export default function VaultDetailPage() {
                                       e.target.value as "Admin" | "Member"
                                     )
                                   }
-                                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                                  className="px-2 sm:px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-slate-100 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer flex-1 sm:flex-none min-w-[100px]"
                                 >
                                   <option value="Member">Member</option>
                                   <option value="Admin">Admin</option>
@@ -1040,7 +1123,7 @@ export default function VaultDetailPage() {
                                     onClick={() =>
                                       handleRemoveMember(member.id)
                                     }
-                                    className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded text-sm hover:bg-red-500/30 transition-colors cursor-pointer"
+                                    className="px-2 sm:px-3 py-1.5 bg-red-500/20 text-red-400 rounded text-xs sm:text-sm hover:bg-red-500/30 transition-colors cursor-pointer whitespace-nowrap"
                                   >
                                     Remove
                                   </button>
@@ -1056,9 +1139,11 @@ export default function VaultDetailPage() {
           )}
 
           {activeTab === "invites" && (
-            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 shadow-xl">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-slate-100">Invites</h2>
+            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-4 md:p-8 border border-slate-700/50 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-100">
+                  Invites
+                </h2>
                 {canManageMembers && (
                   <button
                     onClick={() => {
@@ -1069,9 +1154,11 @@ export default function VaultDetailPage() {
                       });
                       setShowInviteModal(true);
                     }}
-                    className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                    className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer flex items-center gap-2"
                   >
-                    + Create Invite
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">Create Invite</span>
+                    <span className="sm:hidden">Create</span>
                   </button>
                 )}
               </div>
@@ -1089,9 +1176,10 @@ export default function VaultDetailPage() {
                           });
                           setShowInviteModal(true);
                         }}
-                        className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                        className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer flex items-center justify-center gap-2"
                       >
-                        + Create Your First Invite
+                        <Plus className="w-5 h-5" />
+                        Create Your First Invite
                       </button>
                     )}
                   </div>
@@ -1099,14 +1187,14 @@ export default function VaultDetailPage() {
                   invites.map((invite) => (
                     <div
                       key={invite.id}
-                      className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50 flex items-center justify-between"
+                      className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
                     >
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <p className="text-slate-100 font-semibold">
+                      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-slate-100 font-semibold text-sm sm:text-base truncate">
                             {invite.inviteeEmail}
                           </p>
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
                             {getPrivilegeBadge(invite.privilege)}
                             {getStatusBadge(invite.status)}
                           </div>
@@ -1115,18 +1203,18 @@ export default function VaultDetailPage() {
                       {canManageMembers &&
                         (invite.status === "Pending" ||
                           invite.status === "Sent") && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             {invite.status === "Sent" && (
                               <button
                                 onClick={() => handleResendInvite(invite.id)}
-                                className="px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded text-sm hover:bg-blue-500/30 transition-colors cursor-pointer"
+                                className="px-2 sm:px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded text-xs sm:text-sm hover:bg-blue-500/30 transition-colors cursor-pointer whitespace-nowrap"
                               >
                                 Resend
                               </button>
                             )}
                             <button
                               onClick={() => handleCancelInvite(invite.id)}
-                              className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded text-sm hover:bg-red-500/30 transition-colors cursor-pointer"
+                              className="px-2 sm:px-3 py-1.5 bg-red-500/20 text-red-400 rounded text-xs sm:text-sm hover:bg-red-500/30 transition-colors cursor-pointer whitespace-nowrap"
                             >
                               Cancel
                             </button>
@@ -1140,8 +1228,8 @@ export default function VaultDetailPage() {
           )}
 
           {activeTab === "history" && (
-            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 shadow-xl">
-              <h2 className="text-2xl font-bold text-slate-100 mb-6">
+            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-4 md:p-8 border border-slate-700/50 shadow-xl">
+              <h2 className="text-xl md:text-2xl font-bold text-slate-100 mb-6">
                 Vault History
               </h2>
               <div className="space-y-4">
@@ -1192,10 +1280,10 @@ export default function VaultDetailPage() {
                           key={member.id}
                           className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50"
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
                               <div
-                                className={`w-3 h-3 rounded-full ${
+                                className={`w-3 h-3 rounded-full flex-shrink-0 mt-1.5 sm:mt-0 ${
                                   eventColor === "green"
                                     ? "bg-green-500"
                                     : eventColor === "yellow"
@@ -1203,18 +1291,19 @@ export default function VaultDetailPage() {
                                     : "bg-red-500"
                                 }`}
                               />
-                              <div>
-                                <p className="text-slate-100 font-semibold">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-slate-100 font-semibold text-sm sm:text-base truncate">
                                   {member.userName ||
                                     member.userEmail ||
-                                    "Unknown"}
+                                    "Unknown"}{" "}
+                                  <span className="text-slate-400 font-normal">
+                                    • {new Date(eventTime).toLocaleDateString()}
+                                  </span>
                                 </p>
-                                <p className="text-slate-400 text-sm">
+                                <p className="text-slate-400 text-xs sm:text-sm">
                                   {eventType === "Joined" && (
                                     <>
-                                      Joined as{" "}
-                                      {getPrivilegeBadge(member.privilege)} •
-                                      Added by{" "}
+                                      Joined as {member.privilege} • Added by{" "}
                                       <span className="font-medium">
                                         {eventBy}
                                       </span>
@@ -1234,14 +1323,6 @@ export default function VaultDetailPage() {
                                 </p>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <p className="text-slate-300 text-sm font-medium">
-                                {new Date(eventTime).toLocaleDateString()}
-                              </p>
-                              <p className="text-slate-500 text-xs">
-                                {new Date(eventTime).toLocaleTimeString()}
-                              </p>
-                            </div>
                           </div>
                         </div>
                       );
@@ -1252,8 +1333,8 @@ export default function VaultDetailPage() {
           )}
 
           {activeTab === "about" && (
-            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 shadow-xl">
-              <h2 className="text-2xl font-bold text-slate-100 mb-6">
+            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-4 md:p-8 border border-slate-700/50 shadow-xl">
+              <h2 className="text-xl md:text-2xl font-bold text-slate-100 mb-6">
                 Vault Information
               </h2>
               <div className="space-y-6">
@@ -1408,18 +1489,24 @@ export default function VaultDetailPage() {
                     required
                     value={
                       editForm.releaseDate
-                        ? new Date(editForm.releaseDate).toISOString().slice(0, 10)
+                        ? new Date(editForm.releaseDate)
+                            .toISOString()
+                            .slice(0, 10)
                         : ""
                     }
                     onChange={(e) =>
                       setEditForm({
                         ...editForm,
                         releaseDate: e.target.value
-                          ? new Date(e.target.value + "T00:00:00Z").toISOString()
+                          ? new Date(
+                              e.target.value + "T00:00:00Z"
+                            ).toISOString()
                           : undefined,
                       })
                     }
-                    min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
+                    min={new Date(Date.now() + 24 * 60 * 60 * 1000)
+                      .toISOString()
+                      .slice(0, 10)}
                     className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
@@ -1436,18 +1523,24 @@ export default function VaultDetailPage() {
                     required
                     value={
                       editForm.expiresAt
-                        ? new Date(editForm.expiresAt).toISOString().slice(0, 10)
+                        ? new Date(editForm.expiresAt)
+                            .toISOString()
+                            .slice(0, 10)
                         : ""
                     }
                     onChange={(e) =>
                       setEditForm({
                         ...editForm,
                         expiresAt: e.target.value
-                          ? new Date(e.target.value + "T00:00:00Z").toISOString()
+                          ? new Date(
+                              e.target.value + "T00:00:00Z"
+                            ).toISOString()
                           : undefined,
                       })
                     }
-                    min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
+                    min={new Date(Date.now() + 24 * 60 * 60 * 1000)
+                      .toISOString()
+                      .slice(0, 10)}
                     className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
@@ -1464,7 +1557,7 @@ export default function VaultDetailPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                  className="flex-1 px-4 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer"
                 >
                   Save Changes
                 </button>
@@ -1534,7 +1627,9 @@ export default function VaultDetailPage() {
                   type="date"
                   value={
                     inviteForm.inviteExpiresAt
-                      ? new Date(inviteForm.inviteExpiresAt).toISOString().slice(0, 10)
+                      ? new Date(inviteForm.inviteExpiresAt)
+                          .toISOString()
+                          .slice(0, 10)
                       : ""
                   }
                   onChange={(e) =>
@@ -1545,7 +1640,9 @@ export default function VaultDetailPage() {
                         : undefined,
                     })
                   }
-                  min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
+                  min={new Date(Date.now() + 24 * 60 * 60 * 1000)
+                    .toISOString()
+                    .slice(0, 10)}
                   className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
                 <p className="text-xs text-slate-400 mt-1">
@@ -1585,7 +1682,7 @@ export default function VaultDetailPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
+                  className="flex-1 px-4 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer"
                 >
                   Send Invite
                 </button>
@@ -1683,10 +1780,13 @@ export default function VaultDetailPage() {
                 .
               </p>
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mt-4">
-                <p className="text-yellow-400 text-sm font-medium">
-                  ⚠️ Important: After transferring ownership, you will become an
-                  Admin and will no longer have full control over this vault.
-                </p>
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-yellow-400 text-sm font-medium">
+                    Important: After transferring ownership, you will become an
+                    Admin and will no longer have full control over this vault.
+                  </p>
+                </div>
               </div>
             </div>
             <div className="flex space-x-3">

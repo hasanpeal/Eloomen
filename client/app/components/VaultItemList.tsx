@@ -1,6 +1,7 @@
 "use client";
 
 import { VaultItem } from "../lib/api";
+import { FileText, Key, StickyNote, Link as LinkIcon, Wallet, Package } from "lucide-react";
 
 interface VaultItemListProps {
   items: VaultItem[];
@@ -18,19 +19,20 @@ export default function VaultItemList({
   canView = false,
 }: VaultItemListProps) {
   const getItemIcon = (itemType: string) => {
+    const iconClass = "w-5 h-5 text-slate-400";
     switch (itemType) {
       case "Document":
-        return "📄";
+        return <FileText className={iconClass} />;
       case "Password":
-        return "🔑";
+        return <Key className={iconClass} />;
       case "Note":
-        return "📝";
+        return <StickyNote className={iconClass} />;
       case "Link":
-        return "🔗";
+        return <LinkIcon className={iconClass} />;
       case "CryptoWallet":
-        return "₿";
+        return <Wallet className={iconClass} />;
       default:
-        return "📦";
+        return <Package className={iconClass} />;
     }
   };
 
@@ -57,11 +59,11 @@ export default function VaultItemList({
         >
           <div className="flex items-start justify-between mb-2">
             <div
-              className="flex items-center gap-2 flex-1 cursor-pointer"
+              className="flex items-center gap-2 flex-1 cursor-pointer min-w-0"
               onClick={() => canUserView(item) && onView?.(item)}
             >
-              <span className="text-2xl">{getItemIcon(item.itemType)}</span>
-              <h3 className="font-semibold text-lg text-slate-100">
+              <div className="flex-shrink-0">{getItemIcon(item.itemType)}</div>
+              <h3 className="font-semibold text-base md:text-lg text-slate-100 truncate">
                 {item.title}
               </h3>
             </div>
@@ -72,7 +74,7 @@ export default function VaultItemList({
                     e.stopPropagation();
                     onView?.(item);
                   }}
-                  className="px-3 py-1 text-xs bg-slate-700 text-slate-200 rounded hover:bg-slate-600 transition-colors"
+                  className="px-2 sm:px-3 py-1 text-xs bg-slate-700 text-slate-200 rounded hover:bg-slate-600 transition-colors whitespace-nowrap"
                   title="View"
                 >
                   View
@@ -85,7 +87,7 @@ export default function VaultItemList({
                       e.stopPropagation();
                       onEdit?.(item);
                     }}
-                    className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                    className="px-2 sm:px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors whitespace-nowrap"
                     title="Edit"
                   >
                     Edit
@@ -95,7 +97,7 @@ export default function VaultItemList({
                       e.stopPropagation();
                       onDelete?.(item);
                     }}
-                    className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                    className="px-2 sm:px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors whitespace-nowrap"
                     title="Delete"
                   >
                     Delete
@@ -105,7 +107,7 @@ export default function VaultItemList({
             </div>
           </div>
           {item.description && (
-            <p className="text-slate-400 text-sm mb-2 line-clamp-2">
+            <p className="text-slate-400 text-xs sm:text-sm mb-2 line-clamp-2">
               {item.description}
             </p>
           )}

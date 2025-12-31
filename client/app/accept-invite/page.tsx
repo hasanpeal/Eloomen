@@ -156,7 +156,7 @@ function AcceptInviteContent() {
               />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-slate-100 mb-4">
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-100 mb-4">
             Invite Accepted!
           </h1>
           <p className="text-slate-400 mb-6">
@@ -178,7 +178,7 @@ function AcceptInviteContent() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50 flex items-center justify-center">
         <div className="text-center bg-slate-800/60 backdrop-blur-md rounded-3xl p-12 border border-slate-700/50 shadow-2xl max-w-md">
-          <h1 className="text-3xl font-bold text-slate-100 mb-4">
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-100 mb-4">
             Invalid Invite
           </h1>
           <p className="text-slate-400 mb-6">

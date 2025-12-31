@@ -22,16 +22,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" className="dark bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50" suppressHydrationWarning>
       <body
-        className={`${montserrat.variable} font-sans antialiased`}
+        className={`${montserrat.variable} font-sans antialiased bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50`}
         suppressHydrationWarning
       >
         <AuthProvider>{children}</AuthProvider>
-        <Toaster
-          position="top-center"
-          toastOptions={{}}
-        />
+        <Toaster position="top-center" toastOptions={{}} />
       </body>
     </html>
   );
