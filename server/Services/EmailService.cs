@@ -72,8 +72,7 @@ public class EmailService : IEmailService
 
         if (!response.IsSuccessStatusCode)
         {
-            var body = await response.Body.ReadAsStringAsync();
-            throw new InvalidOperationException($"Failed to send email confirmation. Status: {response.StatusCode}, Body: {body}");
+            throw new InvalidOperationException("Failed to send email confirmation");
         }
     }
 
@@ -133,8 +132,7 @@ public class EmailService : IEmailService
 
         if (!response.IsSuccessStatusCode)
         {
-            var body = await response.Body.ReadAsStringAsync();
-            throw new InvalidOperationException($"Failed to send device verification email. Status: {response.StatusCode}, Body: {body}");
+            throw new InvalidOperationException("Failed to send device verification email");
         }
     }
 
@@ -195,8 +193,7 @@ public class EmailService : IEmailService
 
         if (!response.IsSuccessStatusCode)
         {
-            var body = await response.Body.ReadAsStringAsync();
-            throw new InvalidOperationException($"Failed to send password reset email. Status: {response.StatusCode}, Body: {body}");
+            throw new InvalidOperationException("Failed to send password reset email");
         }
     }
 
@@ -277,8 +274,7 @@ public class EmailService : IEmailService
 
         if (!response.IsSuccessStatusCode)
         {
-            var body = await response.Body.ReadAsStringAsync();
-            throw new InvalidOperationException($"Failed to send vault invite email. Status: {response.StatusCode}, Body: {body}");
+            throw new InvalidOperationException("Failed to send vault invite email");
         }
     }
 }

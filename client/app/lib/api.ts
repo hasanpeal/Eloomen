@@ -136,7 +136,7 @@ class ApiClient {
 
         // Try to parse as JSON first
         const contentType = response.headers.get("content-type");
-        let errorMessage = `HTTP error! status: ${response.status}`;
+        let errorMessage = "An error occurred. Please try again.";
 
         if (contentType && contentType.includes("application/json")) {
           try {
@@ -149,12 +149,23 @@ class ApiClient {
             } else if (errorData.error) {
               errorMessage = errorData.error;
             } else if (Array.isArray(errorData)) {
+              // Handle validation errors array
               errorMessage = errorData.join(", ");
             } else if (typeof errorData === "object") {
-              // Try to extract meaningful error message
-              const errorText = JSON.stringify(errorData);
-              if (errorText.length < 200) {
-                errorMessage = errorText;
+              // Handle ModelState errors (object with property names as keys)
+              const keys = Object.keys(errorData);
+              if (keys.length > 0) {
+                const firstKey = keys[0];
+                const firstError = errorData[firstKey];
+                if (Array.isArray(firstError)) {
+                  errorMessage = firstError[0];
+                } else if (typeof firstError === "string") {
+                  errorMessage = firstError;
+                } else {
+                  errorMessage = "Validation failed. Please check your input.";
+                }
+              } else {
+                errorMessage = "An error occurred. Please try again.";
               }
             }
           } catch {
@@ -169,16 +180,21 @@ class ApiClient {
           const text = await response.text();
           if (text && text.length < 200 && !text.includes("<!DOCTYPE")) {
             errorMessage = text;
-          } else if (response.status === 404) {
-            errorMessage =
-              "API endpoint not found. Please check if the backend server is running.";
+          }
+        }
+
+        // Fallback to user-friendly messages based on status code if no message was found
+        if (errorMessage === "An error occurred. Please try again.") {
+          if (response.status === 404) {
+            errorMessage = "Resource not found.";
           } else if (response.status === 500) {
             errorMessage = "Server error. Please try again later.";
           } else if (response.status === 401) {
             errorMessage = "Unauthorized. Please check your credentials.";
           } else if (response.status === 403) {
-            errorMessage =
-              "Forbidden. You don't have permission to access this resource.";
+            errorMessage = "You don't have permission to access this resource.";
+          } else if (response.status === 400) {
+            errorMessage = "Invalid request. Please check your input.";
           }
         }
 
@@ -542,15 +558,10 @@ class ApiClient {
   }
 
   // Policy methods
-  async releaseVaultManually(
-    vaultId: number
-  ): Promise<{ message: string }> {
-    return this.request<{ message: string }>(
-      `/vault/${vaultId}/release`,
-      {
-        method: "POST",
-      }
-    );
+  async releaseVaultManually(vaultId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/vault/${vaultId}/release`, {
+      method: "POST",
+    });
   }
 
   // Vault Item API methods
@@ -772,12 +783,39 @@ class ApiClient {
         if (typeof errorData === "string") return errorData;
         if (errorData.message) return errorData.message;
         if (errorData.error) return errorData.error;
-        return `HTTP error! status: ${response.status}`;
+        if (Array.isArray(errorData)) return errorData.join(", ");
+        // Handle ModelState errors (object with property names as keys)
+        if (typeof errorData === "object") {
+          const keys = Object.keys(errorData);
+          if (keys.length > 0) {
+            const firstKey = keys[0];
+            const firstError = errorData[firstKey];
+            if (Array.isArray(firstError)) {
+              return firstError[0];
+            } else if (typeof firstError === "string") {
+              return firstError;
+            }
+          }
+        }
       } catch {
-        return `HTTP error! status: ${response.status}`;
+        // Fall through to default message
       }
     }
-    return `HTTP error! status: ${response.status}`;
+
+    // Fallback to user-friendly messages based on status code
+    if (response.status === 404) {
+      return "Resource not found.";
+    } else if (response.status === 500) {
+      return "Server error. Please try again later.";
+    } else if (response.status === 401) {
+      return "Unauthorized. Please check your credentials.";
+    } else if (response.status === 403) {
+      return "You don't have permission to access this resource.";
+    } else if (response.status === 400) {
+      return "Invalid request. Please check your input.";
+    }
+
+    return "An error occurred. Please try again.";
   }
 }
 

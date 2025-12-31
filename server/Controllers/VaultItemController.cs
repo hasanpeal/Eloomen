@@ -41,7 +41,7 @@ public class VaultItemController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting vault items for vault {VaultId}: {Message}", vaultId, ex.Message);
-            return StatusCode(500, new { message = "An error occurred while retrieving items", error = ex.Message });
+            return StatusCode(500, new { message = "Failed to retrieve items. Please try again." });
         }
     }
 
@@ -61,7 +61,7 @@ public class VaultItemController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting item {ItemId} from vault {VaultId}: {Message}", itemId, vaultId, ex.Message);
-            return StatusCode(500, new { message = "An error occurred while retrieving the item", error = ex.Message });
+            return StatusCode(500, new { message = "Failed to retrieve item. Please try again." });
         }
     }
 
@@ -114,7 +114,7 @@ public class VaultItemController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating item in vault {VaultId}: {Message}", vaultId, ex.Message);
-            return StatusCode(500, new { message = "An error occurred while creating the item", error = ex.Message });
+            return StatusCode(500, new { message = "Failed to create item. Please try again." });
         }
     }
 
@@ -151,7 +151,7 @@ public class VaultItemController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating item {ItemId} in vault {VaultId}: {Message}", itemId, vaultId, ex.Message);
-            return StatusCode(500, new { message = "An error occurred while updating the item", error = ex.Message });
+            return StatusCode(500, new { message = "Failed to update item. Please try again." });
         }
     }
 
@@ -171,7 +171,7 @@ public class VaultItemController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting item {ItemId} from vault {VaultId}: {Message}", itemId, vaultId, ex.Message);
-            return StatusCode(500, new { message = "An error occurred while deleting the item", error = ex.Message });
+            return StatusCode(500, new { message = "Failed to delete item. Please try again." });
         }
     }
 
@@ -191,7 +191,7 @@ public class VaultItemController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error restoring item {ItemId} in vault {VaultId}: {Message}", itemId, vaultId, ex.Message);
-            return StatusCode(500, new { message = "An error occurred while restoring the item", error = ex.Message });
+            return StatusCode(500, new { message = "Failed to restore item. Please try again." });
         }
     }
 }

@@ -9,6 +9,7 @@ import {
   VaultItem,
   ItemPermission,
   ItemVisibilityRequest,
+  SessionExpiredError,
 } from "../lib/api";
 import toast from "react-hot-toast";
 
@@ -244,6 +245,10 @@ export default function CreateVaultItemModal({
       onSuccess();
       onClose();
     } catch (error: any) {
+      // Don't show toast for session expiration - it's already handled in API client
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
       toast.error(error.message || "Failed to save item");
     } finally {
       setLoading(false);

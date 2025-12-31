@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../contexts/AuthContext";
-import { apiClient, Vault, CreateVaultRequest } from "../lib/api";
+import { apiClient, Vault, CreateVaultRequest, SessionExpiredError } from "../lib/api";
 import toast from "react-hot-toast";
 
 export default function DashboardPage() {
@@ -42,6 +42,10 @@ export default function DashboardPage() {
       const data = await apiClient.getVaults();
       setVaults(data);
     } catch (error) {
+      // Don't show toast for session expiration - it's already handled in API client
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
       const errorMessage =
         error instanceof Error ? error.message : "Failed to load vaults";
       toast.error(errorMessage);
@@ -63,6 +67,10 @@ export default function DashboardPage() {
       });
       loadVaults();
     } catch (error) {
+      // Don't show toast for session expiration - it's already handled in API client
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
       const errorMessage =
         error instanceof Error ? error.message : "Failed to create vault";
       toast.error(errorMessage);

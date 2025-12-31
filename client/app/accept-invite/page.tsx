@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../contexts/AuthContext";
-import { apiClient } from "../lib/api";
+import { apiClient, SessionExpiredError } from "../lib/api";
 import toast from "react-hot-toast";
 
 function AcceptInviteContent() {
@@ -30,6 +30,10 @@ function AcceptInviteContent() {
         router.push("/dashboard");
       }, 2000);
     } catch (error) {
+      // Don't show toast for session expiration - it's already handled in API client
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
       const errorMessage =
         error instanceof Error ? error.message : "Failed to accept invite";
       toast.error(errorMessage);
@@ -86,6 +90,10 @@ function AcceptInviteContent() {
           }
         }
       } catch (error) {
+        // Don't show toast for session expiration - it's already handled in API client
+        if (error instanceof SessionExpiredError) {
+          return;
+        }
         const errorMessage =
           error instanceof Error ? error.message : "Failed to validate invite";
         console.error("Error checking invite:", error);

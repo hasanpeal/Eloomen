@@ -891,6 +891,10 @@ export default function VaultDetailPage() {
                           setViewingItem(fullItem);
                           setShowViewModal(true);
                         } catch (error: unknown) {
+                          // Don't show toast for session expiration - it's already handled in API client
+                          if (error instanceof SessionExpiredError) {
+                            return;
+                          }
                           const errorMessage =
                             error instanceof Error
                               ? error.message
@@ -1740,6 +1744,10 @@ export default function VaultDetailPage() {
             setDeletingItem(null);
             loadVaultData();
           } catch (error: unknown) {
+            // Don't show toast for session expiration - it's already handled in API client
+            if (error instanceof SessionExpiredError) {
+              return;
+            }
             const errorMessage =
               error instanceof Error ? error.message : "Failed to delete item";
             toast.error(errorMessage);
@@ -1773,6 +1781,10 @@ export default function VaultDetailPage() {
               setShowViewModal(false);
               setShowItemModal(true);
             } catch (error: unknown) {
+              // Don't show toast for session expiration - it's already handled in API client
+              if (error instanceof SessionExpiredError) {
+                return;
+              }
               const errorMessage =
                 error instanceof Error
                   ? error.message

@@ -128,7 +128,7 @@ public class VaultController : ControllerBase
         {
             // Log the exception for debugging
             _logger.LogError(ex, "Error creating invite for vault {VaultId}: {Message}", id, ex.Message);
-            return StatusCode(500, new { message = $"An error occurred while creating the invite: {ex.Message}" });
+            return StatusCode(500, new { message = "Failed to create invite. Please try again." });
         }
     }
 

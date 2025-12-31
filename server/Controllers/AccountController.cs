@@ -67,12 +67,12 @@ public class AccountController : ControllerBase
         // Create user (Identity handles persistence)
         var createResult = await _userManager.CreateAsync(user, dto.Password);
         if (!createResult.Succeeded)
-            return StatusCode(500, createResult.Errors.Select(e => e.Description));
+            return BadRequest(createResult.Errors.Select(e => e.Description));
 
         // Add role
         var roleResult = await _userManager.AddToRoleAsync(user, "User");
         if (!roleResult.Succeeded)
-            return StatusCode(500, roleResult.Errors.Select(e => e.Description));
+            return BadRequest(roleResult.Errors.Select(e => e.Description));
 
         // Device creation
         var deviceIdentifier = GetOrCreateDeviceId();
