@@ -215,22 +215,32 @@ public class AccountController : ControllerBase
             return Unauthorized($"Account is locked out. Lockout end: {user.LockoutEnd.Value.ToLocalTime()}");
         }
 
-        // Only generate refresh token if "Remember Me" is checked
+        // Always generate refresh token
+        var refreshTokenValue = _tokenService.CreateRefreshToken();
+        DateTime expiresAt;
+        
         if (dto.RememberMe)
         {
-            var refreshTokenValue = _tokenService.CreateRefreshToken();
-            var refreshToken = new RefreshToken
-            {
-                Token = refreshTokenValue,
-                UserDeviceId = device.Id,
-                ExpiresAt = DateTime.UtcNow.AddDays(int.Parse(_config["Jwt:RefreshTokenDays"])),
-                Revoked = false
-            };
-            
-            _dbContext.RefreshTokens.Add(refreshToken);
-            await _dbContext.SaveChangesAsync();
-            SetRefreshCookie(refreshToken);
+            // Persistent cookie: expires in configured days
+            expiresAt = DateTime.UtcNow.AddDays(int.Parse(_config["Jwt:RefreshTokenDays"]));
         }
+        else
+        {
+            // Session cookie: 24 hours in database for security, but cookie has no Expires (browser deletes on close)
+            expiresAt = DateTime.UtcNow.AddHours(24);
+        }
+        
+        var refreshToken = new RefreshToken
+        {
+            Token = refreshTokenValue,
+            UserDeviceId = device.Id,
+            ExpiresAt = expiresAt,
+            Revoked = false
+        };
+        
+        _dbContext.RefreshTokens.Add(refreshToken);
+        await _dbContext.SaveChangesAsync();
+        SetRefreshCookie(refreshToken, dto.RememberMe);
 
         // Accept invite if provided
         if (!string.IsNullOrEmpty(dto.InviteToken))
@@ -297,21 +307,36 @@ public class AccountController : ControllerBase
         refreshToken.Revoked = true;
 
         var newTokenValue = _tokenService.CreateRefreshToken();
+        
+        // Determine expiration based on original token
+        // If original expires in more than 24 hours, it was a "Remember Me" token
+        DateTime newExpiresAt;
+        bool isPersistent;
+        if (refreshToken.ExpiresAt > DateTime.UtcNow.AddHours(24))
+        {
+            // Original was persistent, keep it persistent
+            newExpiresAt = DateTime.UtcNow.AddDays(int.Parse(_config["Jwt:RefreshTokenDays"]!));
+            isPersistent = true;
+        }
+        else
+        {
+            // Original was session cookie, keep it as session cookie
+            newExpiresAt = DateTime.UtcNow.AddHours(24);
+            isPersistent = false;
+        }
 
         var newRefreshToken = new RefreshToken
         {
             Token = newTokenValue,
             UserDeviceId = refreshToken.UserDeviceId,
-            ExpiresAt = DateTime.UtcNow.AddDays(
-                int.Parse(_config["Jwt:RefreshTokenDays"]!)
-            ),
+            ExpiresAt = newExpiresAt,
             Revoked = false
         };
 
         _dbContext.RefreshTokens.Add(newRefreshToken);
         await _dbContext.SaveChangesAsync();
 
-        SetRefreshCookie(newRefreshToken);
+        SetRefreshCookie(newRefreshToken, isPersistent);
 
         return Ok(new
         {
@@ -773,16 +798,24 @@ public class AccountController : ControllerBase
     // --------------------
 
     // Helper function to save refresh token on http cookies
-    private void SetRefreshCookie(RefreshToken token)
+    private void SetRefreshCookie(RefreshToken token, bool isPersistent = true)
     {
-        Response.Cookies.Append("refreshToken", token.Token, new CookieOptions
+        var cookieOptions = new CookieOptions
         {
             HttpOnly = true,
             Secure = true, // HTTPS only (recommended for production)
             SameSite = SameSiteMode.Lax, // Works for same-site requests (www.eloomen.com <-> api.eloomen.com)
-            Expires = token.ExpiresAt,
             Path = "/"
-        });
+        };
+        
+        // Only set Expires for persistent cookies (Remember Me checked)
+        // Session cookies (Remember Me unchecked) will be deleted when browser closes
+        if (isPersistent)
+        {
+            cookieOptions.Expires = token.ExpiresAt;
+        }
+        
+        Response.Cookies.Append("refreshToken", token.Token, cookieOptions);
     }
     
     // Helper methods for verification codes

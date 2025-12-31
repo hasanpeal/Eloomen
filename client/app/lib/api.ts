@@ -44,6 +44,7 @@ class ApiClient {
   private isRefreshing = false;
   private refreshPromise: Promise<string | null> | null = null;
   private sessionExpiredToastShown = false;
+  private useSessionStorage = false; // Track whether to use sessionStorage (false = localStorage)
 
   private async request<T>(
     endpoint: string,
@@ -239,7 +240,8 @@ class ApiClient {
 
         const data = await response.json();
         if (data.token) {
-          this.setToken(data.token);
+          // Maintain the same storage type (sessionStorage vs localStorage) when refreshing
+          this.setToken(data.token, this.useSessionStorage);
           return data.token;
         }
         return null;
@@ -257,17 +259,42 @@ class ApiClient {
 
   private getToken(): string | null {
     if (typeof window === "undefined") return null;
-    return localStorage.getItem("accessToken");
+    // Check both storages - if sessionStorage has a token, we're in a non-remembered session
+    const sessionToken = sessionStorage.getItem("accessToken");
+    if (sessionToken) {
+      this.useSessionStorage = true;
+      return sessionToken;
+    }
+    const localToken = localStorage.getItem("accessToken");
+    if (localToken) {
+      this.useSessionStorage = false;
+      return localToken;
+    }
+    return null;
   }
 
-  private setToken(token: string): void {
+  private setToken(token: string, useSessionStorage: boolean = false): void {
     if (typeof window === "undefined") return;
-    localStorage.setItem("accessToken", token);
+    this.useSessionStorage = useSessionStorage;
+
+    // Clear token from both storages first
+    localStorage.removeItem("accessToken");
+    sessionStorage.removeItem("accessToken");
+
+    // Store in the appropriate storage
+    if (useSessionStorage) {
+      sessionStorage.setItem("accessToken", token);
+    } else {
+      localStorage.setItem("accessToken", token);
+    }
   }
 
   private removeToken(): void {
     if (typeof window === "undefined") return;
+    // Remove from both storages to be safe
     localStorage.removeItem("accessToken");
+    sessionStorage.removeItem("accessToken");
+    this.useSessionStorage = false;
   }
 
   async login(
@@ -287,7 +314,7 @@ class ApiClient {
     });
 
     if (response.token) {
-      this.setToken(response.token);
+      this.setToken(response.token, !rememberMe); // Use sessionStorage when RememberMe is false
     }
 
     return response;
@@ -346,7 +373,8 @@ class ApiClient {
     });
 
     if (response.token) {
-      this.setToken(response.token);
+      // Use sessionStorage for device verification (non-persistent session)
+      this.setToken(response.token, true);
     }
 
     return response;
