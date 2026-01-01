@@ -82,13 +82,13 @@ function ResetPasswordContent() {
       <div className="w-full max-w-md relative z-10">
         {/* Logo */}
         <Link href="/" className="inline-block mb-8 group">
-          <span className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
+          <span className="text-2xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
             Eloomen
           </span>
         </Link>
 
         {/* Title */}
-        <h1 className="text-3xl font-bold text-white mb-2">Reset Password</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Reset Password</h1>
         <p className="text-slate-400 mb-8">
           Enter the code from your email and your new password.
         </p>
@@ -153,6 +153,7 @@ function ResetPasswordContent() {
                   type="email"
                   id="email"
                   name="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -172,6 +173,7 @@ function ResetPasswordContent() {
                 <input
                   type="text"
                   id="code"
+                  autoComplete="one-time-code"
                   value={code}
                   onChange={(e) =>
                     setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
@@ -197,6 +199,7 @@ function ResetPasswordContent() {
                   <input
                     type={showPassword ? "text" : "password"}
                     id="newPassword"
+                    autoComplete="new-password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     required
@@ -259,6 +262,7 @@ function ResetPasswordContent() {
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     id="confirmPassword"
+                    autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required

@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../contexts/AuthContext";
-import { apiClient } from "../lib/api";
+import { apiClient, SessionExpiredError } from "../lib/api";
 import toast from "react-hot-toast";
 
 function AcceptInviteContent() {
@@ -27,9 +27,13 @@ function AcceptInviteContent() {
       setSuccess(true);
       toast.success("Invite accepted successfully!");
       setTimeout(() => {
-        router.push("/vaults");
+        router.push("/dashboard");
       }, 2000);
     } catch (error) {
+      // Don't show toast for session expiration - it's already handled in API client
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
       const errorMessage =
         error instanceof Error ? error.message : "Failed to accept invite";
       toast.error(errorMessage);
@@ -86,6 +90,10 @@ function AcceptInviteContent() {
           }
         }
       } catch (error) {
+        // Don't show toast for session expiration - it's already handled in API client
+        if (error instanceof SessionExpiredError) {
+          return;
+        }
         const errorMessage =
           error instanceof Error ? error.message : "Failed to validate invite";
         console.error("Error checking invite:", error);
@@ -148,15 +156,15 @@ function AcceptInviteContent() {
               />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-slate-100 mb-4">
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-100 mb-4">
             Invite Accepted!
           </h1>
           <p className="text-slate-400 mb-6">
             You&apos;ve successfully joined the vault. Redirecting to your
-            vaults...
+            vaults.
           </p>
           <Link
-            href="/vaults"
+            href="/dashboard"
             className="inline-block px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200"
           >
             Go to Vaults
@@ -170,14 +178,14 @@ function AcceptInviteContent() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50 flex items-center justify-center">
         <div className="text-center bg-slate-800/60 backdrop-blur-md rounded-3xl p-12 border border-slate-700/50 shadow-2xl max-w-md">
-          <h1 className="text-3xl font-bold text-slate-100 mb-4">
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-100 mb-4">
             Invalid Invite
           </h1>
           <p className="text-slate-400 mb-6">
             This invite link is invalid or missing a token.
           </p>
           <Link
-            href="/vaults"
+            href="/dashboard"
             className="inline-block px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200"
           >
             Go to Vaults

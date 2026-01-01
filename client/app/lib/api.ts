@@ -44,6 +44,7 @@ class ApiClient {
   private isRefreshing = false;
   private refreshPromise: Promise<string | null> | null = null;
   private sessionExpiredToastShown = false;
+  private useSessionStorage = false; // Track whether to use sessionStorage (false = localStorage)
 
   private async request<T>(
     endpoint: string,
@@ -136,7 +137,7 @@ class ApiClient {
 
         // Try to parse as JSON first
         const contentType = response.headers.get("content-type");
-        let errorMessage = `HTTP error! status: ${response.status}`;
+        let errorMessage = "An error occurred. Please try again.";
 
         if (contentType && contentType.includes("application/json")) {
           try {
@@ -149,12 +150,23 @@ class ApiClient {
             } else if (errorData.error) {
               errorMessage = errorData.error;
             } else if (Array.isArray(errorData)) {
+              // Handle validation errors array
               errorMessage = errorData.join(", ");
             } else if (typeof errorData === "object") {
-              // Try to extract meaningful error message
-              const errorText = JSON.stringify(errorData);
-              if (errorText.length < 200) {
-                errorMessage = errorText;
+              // Handle ModelState errors (object with property names as keys)
+              const keys = Object.keys(errorData);
+              if (keys.length > 0) {
+                const firstKey = keys[0];
+                const firstError = errorData[firstKey];
+                if (Array.isArray(firstError)) {
+                  errorMessage = firstError[0];
+                } else if (typeof firstError === "string") {
+                  errorMessage = firstError;
+                } else {
+                  errorMessage = "Validation failed. Please check your input.";
+                }
+              } else {
+                errorMessage = "An error occurred. Please try again.";
               }
             }
           } catch {
@@ -169,16 +181,21 @@ class ApiClient {
           const text = await response.text();
           if (text && text.length < 200 && !text.includes("<!DOCTYPE")) {
             errorMessage = text;
-          } else if (response.status === 404) {
-            errorMessage =
-              "API endpoint not found. Please check if the backend server is running.";
+          }
+        }
+
+        // Fallback to user-friendly messages based on status code if no message was found
+        if (errorMessage === "An error occurred. Please try again.") {
+          if (response.status === 404) {
+            errorMessage = "Resource not found.";
           } else if (response.status === 500) {
             errorMessage = "Server error. Please try again later.";
           } else if (response.status === 401) {
             errorMessage = "Unauthorized. Please check your credentials.";
           } else if (response.status === 403) {
-            errorMessage =
-              "Forbidden. You don't have permission to access this resource.";
+            errorMessage = "You don't have permission to access this resource.";
+          } else if (response.status === 400) {
+            errorMessage = "Invalid request. Please check your input.";
           }
         }
 
@@ -223,7 +240,8 @@ class ApiClient {
 
         const data = await response.json();
         if (data.token) {
-          this.setToken(data.token);
+          // Maintain the same storage type (sessionStorage vs localStorage) when refreshing
+          this.setToken(data.token, this.useSessionStorage);
           return data.token;
         }
         return null;
@@ -241,17 +259,42 @@ class ApiClient {
 
   private getToken(): string | null {
     if (typeof window === "undefined") return null;
-    return localStorage.getItem("accessToken");
+    // Check both storages - if sessionStorage has a token, we're in a non-remembered session
+    const sessionToken = sessionStorage.getItem("accessToken");
+    if (sessionToken) {
+      this.useSessionStorage = true;
+      return sessionToken;
+    }
+    const localToken = localStorage.getItem("accessToken");
+    if (localToken) {
+      this.useSessionStorage = false;
+      return localToken;
+    }
+    return null;
   }
 
-  private setToken(token: string): void {
+  private setToken(token: string, useSessionStorage: boolean = false): void {
     if (typeof window === "undefined") return;
-    localStorage.setItem("accessToken", token);
+    this.useSessionStorage = useSessionStorage;
+
+    // Clear token from both storages first
+    localStorage.removeItem("accessToken");
+    sessionStorage.removeItem("accessToken");
+
+    // Store in the appropriate storage
+    if (useSessionStorage) {
+      sessionStorage.setItem("accessToken", token);
+    } else {
+      localStorage.setItem("accessToken", token);
+    }
   }
 
   private removeToken(): void {
     if (typeof window === "undefined") return;
+    // Remove from both storages to be safe
     localStorage.removeItem("accessToken");
+    sessionStorage.removeItem("accessToken");
+    this.useSessionStorage = false;
   }
 
   async login(
@@ -271,7 +314,7 @@ class ApiClient {
     });
 
     if (response.token) {
-      this.setToken(response.token);
+      this.setToken(response.token, !rememberMe); // Use sessionStorage when RememberMe is false
     }
 
     return response;
@@ -309,28 +352,33 @@ class ApiClient {
 
   async verifyDevice(
     usernameOrEmail: string,
-    code: string
+    code: string,
+    inviteToken?: string
   ): Promise<{
     message: string;
     userName?: string;
     email?: string;
     token?: string;
+    inviteAccepted?: boolean;
   }> {
     const response = await this.request<{
       message: string;
       userName?: string;
       email?: string;
       token?: string;
+      inviteAccepted?: boolean;
     }>("/account/verify-device", {
       method: "POST",
       body: JSON.stringify({
         UsernameOrEmail: usernameOrEmail,
         Code: code,
+        InviteToken: inviteToken || undefined,
       }),
     });
 
     if (response.token) {
-      this.setToken(response.token);
+      // Use sessionStorage for device verification (non-persistent session)
+      this.setToken(response.token, true);
     }
 
     return response;
@@ -390,6 +438,63 @@ class ApiClient {
   async getCurrentUser(): Promise<{ username: string; email: string }> {
     return this.request<{ username: string; email: string }>("/account/user", {
       method: "GET",
+    });
+  }
+
+  async getUserDevices(): Promise<UserDevice[]> {
+    return this.request<UserDevice[]>("/account/devices", {
+      method: "GET",
+    });
+  }
+
+  async revokeDevice(deviceId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/account/device/${deviceId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getAccountLogs(): Promise<AccountLog[]> {
+    return this.request<AccountLog[]>("/account/logs", {
+      method: "GET",
+    });
+  }
+
+  async updateProfile(data: {
+    username?: string;
+    email?: string;
+  }): Promise<{ message: string }> {
+    return this.request<{ message: string }>("/account/profile", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAccount(): Promise<{ message: string }> {
+    return this.request<{ message: string }>("/account/account", {
+      method: "DELETE",
+    });
+  }
+
+  async changePassword(
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ message: string }> {
+    return this.request<{ message: string }>("/account/change-password", {
+      method: "POST",
+      body: JSON.stringify({
+        CurrentPassword: currentPassword,
+        NewPassword: newPassword,
+      }),
+    });
+  }
+
+  async sendContact(name: string, message: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>("/contact", {
+      method: "POST",
+      body: JSON.stringify({
+        Name: name,
+        Message: message,
+      }),
     });
   }
 
@@ -503,6 +608,12 @@ class ApiClient {
     });
   }
 
+  async getVaultLogs(vaultId: number): Promise<VaultLog[]> {
+    return this.request<VaultLog[]>(`/vault/${vaultId}/logs`, {
+      method: "GET",
+    });
+  }
+
   async removeMember(vaultId: number, memberId: number): Promise<void> {
     return this.request<void>(`/vault/${vaultId}/members/${memberId}`, {
       method: "DELETE",
@@ -537,6 +648,13 @@ class ApiClient {
 
   async leaveVault(vaultId: number): Promise<{ message: string }> {
     return this.request<{ message: string }>(`/vault/${vaultId}/leave`, {
+      method: "POST",
+    });
+  }
+
+  // Policy methods
+  async releaseVaultManually(vaultId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/vault/${vaultId}/release`, {
       method: "POST",
     });
   }
@@ -760,12 +878,39 @@ class ApiClient {
         if (typeof errorData === "string") return errorData;
         if (errorData.message) return errorData.message;
         if (errorData.error) return errorData.error;
-        return `HTTP error! status: ${response.status}`;
+        if (Array.isArray(errorData)) return errorData.join(", ");
+        // Handle ModelState errors (object with property names as keys)
+        if (typeof errorData === "object") {
+          const keys = Object.keys(errorData);
+          if (keys.length > 0) {
+            const firstKey = keys[0];
+            const firstError = errorData[firstKey];
+            if (Array.isArray(firstError)) {
+              return firstError[0];
+            } else if (typeof firstError === "string") {
+              return firstError;
+            }
+          }
+        }
       } catch {
-        return `HTTP error! status: ${response.status}`;
+        // Fall through to default message
       }
     }
-    return `HTTP error! status: ${response.status}`;
+
+    // Fallback to user-friendly messages based on status code
+    if (response.status === 404) {
+      return "Resource not found.";
+    } else if (response.status === 500) {
+      return "Server error. Please try again later.";
+    } else if (response.status === 401) {
+      return "Unauthorized. Please check your credentials.";
+    } else if (response.status === 403) {
+      return "You don't have permission to access this resource.";
+    } else if (response.status === 400) {
+      return "Invalid request. Please check your input.";
+    }
+
+    return "An error occurred. Please try again.";
   }
 }
 
@@ -784,6 +929,7 @@ export interface Vault {
   createdAt: string;
   deletedAt?: string;
   userPrivilege?: "Owner" | "Admin" | "Member";
+  policy?: VaultPolicy;
 }
 
 export interface VaultInvite {
@@ -794,9 +940,7 @@ export interface VaultInvite {
   inviteeEmail: string;
   inviteeId?: string;
   privilege: "Owner" | "Admin" | "Member";
-  inviteType: "Immediate" | "Delayed";
   status: "Pending" | "Sent" | "Accepted" | "Cancelled" | "Expired";
-  sentAt?: string;
   expiresAt?: string;
   createdAt: string;
   acceptedAt?: string;
@@ -822,21 +966,49 @@ export interface VaultMember {
   removedAt?: string;
 }
 
+export interface VaultLog {
+  id: number;
+  vaultId: number;
+  userId: string;
+  userEmail?: string;
+  userName?: string;
+  targetUserId?: string;
+  targetUserEmail?: string;
+  targetUserName?: string;
+  itemId?: number;
+  action: string;
+  timestamp: string;
+  additionalContext?: string;
+}
+
+export interface VaultPolicy {
+  policyType: "Immediate" | "TimeBased" | "ExpiryBased" | "ManualRelease";
+  releaseStatus: "Pending" | "Released" | "Expired" | "Revoked";
+  releaseDate?: string;
+  expiresAt?: string;
+  releasedAt?: string;
+}
+
 export interface CreateVaultRequest {
   name: string;
   description?: string;
+  policyType: "Immediate" | "TimeBased" | "ExpiryBased" | "ManualRelease";
+  releaseDate?: string;
+  expiresAt?: string;
 }
 
 export interface UpdateVaultRequest {
   name: string;
   description?: string;
+  policyType: "Immediate" | "TimeBased" | "ExpiryBased" | "ManualRelease";
+  releaseDate?: string;
+  expiresAt?: string;
 }
 
 export interface CreateInviteRequest {
   inviteeEmail: string;
   privilege: "Owner" | "Admin" | "Member";
-  inviteType: "Immediate" | "Delayed";
-  expiresAt?: string;
+  inviteExpiresAt?: string; // When the invite itself expires - ISO date string
   note?: string;
 }
 
@@ -992,6 +1164,22 @@ export interface UpdateVaultItemRequest {
 export interface ItemVisibilityRequest {
   vaultMemberId: number;
   permission: ItemPermission;
+}
+
+export interface UserDevice {
+  id: number;
+  deviceIdentifier: string;
+  isVerified: boolean;
+  verifiedAt?: string;
+  createdAt: string;
+  activeTokens: number;
+}
+
+export interface AccountLog {
+  id: number;
+  action: string;
+  timestamp: string;
+  additionalContext?: string;
 }
 
 export const apiClient = new ApiClient();

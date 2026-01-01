@@ -116,11 +116,7 @@ function SignupContent() {
         }
       } else {
         // If invite was accepted, go to vaults, otherwise login
-        if (inviteToken) {
-          router.push("/vaults");
-        } else {
-          router.push("/login");
-        }
+        router.push("/dashboard");
       }
     } catch (error) {
       const errorMessage =
@@ -144,11 +140,11 @@ function SignupContent() {
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-block mb-6 group">
-            <span className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
+            <span className="text-2xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
               Eloomen
             </span>
           </Link>
-          <h1 className="text-4xl font-bold text-slate-100 mb-2">
+          <h1 className="text-2xl md:text-4xl font-bold text-slate-100 mb-2">
             Create your account
           </h1>
           <p className="text-slate-400 text-lg">
@@ -194,6 +190,7 @@ function SignupContent() {
                 type="text"
                 id="username"
                 name="username"
+                autoComplete="username"
                 value={formData.username}
                 onChange={handleChange}
                 required
@@ -218,6 +215,7 @@ function SignupContent() {
                 type="email"
                 id="email"
                 name="email"
+                autoComplete="email"
                 value={formData.email}
                 onChange={handleChange}
                 required
@@ -245,6 +243,7 @@ function SignupContent() {
                   type={showPassword ? "text" : "password"}
                   id="password"
                   name="password"
+                  autoComplete="new-password"
                   value={formData.password}
                   onChange={handleChange}
                   required
@@ -307,6 +306,7 @@ function SignupContent() {
                   type={showConfirmPassword ? "text" : "password"}
                   id="confirmPassword"
                   name="confirmPassword"
+                  autoComplete="new-password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   required

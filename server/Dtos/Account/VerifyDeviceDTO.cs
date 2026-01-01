@@ -9,5 +9,7 @@ public class VerifyDeviceDTO
     
     [Required]
     public string Code { get; set; } = string.Empty;
+    
+    public string? InviteToken { get; set; }
 }
 

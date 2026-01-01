@@ -19,8 +19,13 @@ function VerifyDeviceContent() {
 
   useEffect(() => {
     const usernameOrEmailParam = searchParams.get("usernameOrEmail");
+    const inviteTokenParam = searchParams.get("token");
     if (usernameOrEmailParam) {
       setUsernameOrEmail(usernameOrEmailParam);
+    }
+    // Store invite token for later use
+    if (inviteTokenParam) {
+      sessionStorage.setItem("pendingInviteToken", inviteTokenParam);
     }
   }, [searchParams]);
 
@@ -36,7 +41,9 @@ function VerifyDeviceContent() {
     }
 
     try {
-      const response = await apiClient.verifyDevice(usernameOrEmail, code);
+      // Get invite token from session storage or URL params
+      const inviteToken = searchParams.get("token") || sessionStorage.getItem("pendingInviteToken");
+      const response = await apiClient.verifyDevice(usernameOrEmail, code, inviteToken || undefined);
 
       if (response.token && response.userName && response.email) {
         // Update auth context with user info directly from response
@@ -46,8 +53,18 @@ function VerifyDeviceContent() {
           email: response.email,
         });
         setSuccess(true);
+        
+        // Clear pending invite token from session storage
+        if (inviteToken) {
+          sessionStorage.removeItem("pendingInviteToken");
+        }
+        
         toast.success("Device verified successfully.");
-        router.push("/dashboard");
+        
+        // Redirect based on whether invite was accepted
+        if (response.inviteAccepted) {
+          router.push("/dashboard");
+        } 
       } else {
         setError(response.message || "Verification failed. Please try again.");
       }
@@ -106,11 +123,11 @@ function VerifyDeviceContent() {
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-block mb-6 group">
-            <span className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
+            <span className="text-2xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
               Eloomen
             </span>
           </Link>
-          <h1 className="text-4xl font-bold text-slate-100 mb-2">
+          <h1 className="text-2xl md:text-4xl font-bold text-slate-100 mb-2">
             Verify Your Device
           </h1>
           <p className="text-slate-400 text-lg">

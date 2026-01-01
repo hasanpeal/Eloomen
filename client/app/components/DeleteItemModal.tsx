@@ -6,6 +6,7 @@ interface DeleteItemModalProps {
   onConfirm: () => void;
   itemTitle: string;
   itemType: string;
+  hasDocument?: boolean;
   loading?: boolean;
 }
 
@@ -15,9 +16,29 @@ export default function DeleteItemModal({
   onConfirm,
   itemTitle,
   itemType,
+  hasDocument = false,
   loading = false,
 }: DeleteItemModalProps) {
   if (!isOpen) return null;
+
+  const getItemTypeDisplayName = (type: string) => {
+    switch (type) {
+      case "Document":
+        return "Document";
+      case "Password":
+        return "Password";
+      case "Note":
+        return "Note";
+      case "Link":
+        return "Link";
+      case "CryptoWallet":
+        return "Crypto Wallet";
+      default:
+        return type;
+    }
+  };
+
+  const itemTypeDisplay = getItemTypeDisplayName(itemType);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -39,26 +60,46 @@ export default function DeleteItemModal({
             </svg>
           </div>
           <h3 className="text-xl font-bold text-slate-100 text-center mb-2">
-            Delete {itemType}?
+            Delete {itemTypeDisplay}?
           </h3>
-          <p className="text-slate-400 text-center">
-            Are you sure you want to delete <span className="font-semibold text-slate-200">"{itemTitle}"</span>?
-            This action cannot be undone.
+          <p className="text-slate-400 text-center mb-4">
+            Are you sure you want to delete{" "}
+            <span className="font-semibold text-slate-200">
+              &quot;{itemTitle}&quot;
+            </span>
+            ?
           </p>
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+            <p className="text-red-400 text-sm text-center">
+              <strong>Warning:</strong> This action cannot be undone. This will
+              permanently delete:
+            </p>
+            <ul className="text-red-300 text-sm mt-2 space-y-1 list-disc list-inside">
+              <li>This {itemTypeDisplay.toLowerCase()} and all its data</li>
+              {hasDocument && <li>The document file stored</li>}
+              {itemType === "Password" && (
+                <li>All stored credentials and passwords</li>
+              )}
+              {itemType === "CryptoWallet" && (
+                <li>All wallet information and secrets</li>
+              )}
+              <li>All visibility permissions for this item</li>
+            </ul>
+          </div>
         </div>
 
         <div className="flex gap-3">
           <button
             onClick={onClose}
             disabled={loading}
-            className="flex-1 px-4 py-3 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-3 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={loading}
-            className="flex-1 px-4 py-3 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-3 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {loading ? "Deleting..." : "Delete"}
           </button>
@@ -67,4 +108,3 @@ export default function DeleteItemModal({
     </div>
   );
 }
-

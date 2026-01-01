@@ -82,11 +82,7 @@ function LoginContent() {
       if (result.success) {
         toast.success("Login successful");
         // If invite was accepted, go to vaults, otherwise dashboard
-        if (inviteToken) {
-          router.push("/vaults");
-        } else {
-          router.push("/dashboard");
-        }
+        router.push("/dashboard");
       } else if (result.requiresVerification) {
         // Use verificationType from backend response
         if (result.verificationType === "Device") {
@@ -136,11 +132,11 @@ function LoginContent() {
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-block mb-6 group">
-            <span className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
+            <span className="text-2xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
               Eloomen
             </span>
           </Link>
-          <h1 className="text-4xl font-bold text-slate-100 mb-2">
+          <h1 className="text-2xl md:text-4xl font-bold text-slate-100 mb-2">
             Welcome back
           </h1>
           <p className="text-slate-400 text-lg">
@@ -171,6 +167,7 @@ function LoginContent() {
                 type="text"
                 id="usernameOrEmail"
                 name="usernameOrEmail"
+                autoComplete="username"
                 value={formData.usernameOrEmail}
                 onChange={handleChange}
                 required
@@ -197,6 +194,7 @@ function LoginContent() {
                   type={showPassword ? "text" : "password"}
                   id="password"
                   name="password"
+                  autoComplete="current-password"
                   value={formData.password}
                   onChange={handleChange}
                   required

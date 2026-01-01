@@ -128,7 +128,7 @@ public class VaultController : ControllerBase
         {
             // Log the exception for debugging
             _logger.LogError(ex, "Error creating invite for vault {VaultId}: {Message}", id, ex.Message);
-            return StatusCode(500, new { message = $"An error occurred while creating the invite: {ex.Message}" });
+            return StatusCode(500, new { message = "Failed to create invite. Please try again." });
         }
     }
 
@@ -272,6 +272,40 @@ public class VaultController : ControllerBase
             return BadRequest("Cannot leave vault (not a member or owner must transfer ownership first)");
 
         return Ok(new { message = "Left vault successfully" });
+    }
+
+    // Policy operations
+    [HttpPost("{id}/release")]
+    public async Task<ActionResult> ReleaseVaultManually(int id)
+    {
+        var userId = GetUserId();
+        var result = await _vaultService.ReleaseVaultManuallyAsync(id, userId);
+        
+        if (!result)
+            return BadRequest("Cannot release vault (insufficient permissions or policy type doesn't support manual release)");
+
+        return Ok(new { message = "Vault released successfully" });
+    }
+
+    // Logs
+    [HttpGet("{id}/logs")]
+    public async Task<ActionResult<List<VaultLogResponseDTO>>> GetVaultLogs(int id)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var logs = await _vaultService.GetVaultLogsAsync(id, userId);
+            return Ok(logs);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting vault logs for vault {VaultId}: {Message}", id, ex.Message);
+            return StatusCode(500, new { message = "Failed to retrieve vault logs. Please try again." });
+        }
     }
 }
 

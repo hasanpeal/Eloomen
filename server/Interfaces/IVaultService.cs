@@ -27,11 +27,18 @@ public interface IVaultService
     Task<bool> TransferOwnershipAsync(int vaultId, TransferOwnershipDTO dto, string userId);
     Task<bool> LeaveVaultAsync(int vaultId, string userId);
     
+    // Policy operations
+    Task<bool> ReleaseVaultManuallyAsync(int vaultId, string userId);
+    
     // Permission checks
     Task<Privilege?> GetUserPrivilegeAsync(int vaultId, string userId);
     Task<bool> CanViewVaultAsync(int vaultId, string userId);
     Task<bool> CanEditVaultAsync(int vaultId, string userId);
     Task<bool> CanManageMembersAsync(int vaultId, string userId);
     Task<bool> CanDeleteVaultAsync(int vaultId, string userId);
+    Task<bool> IsVaultAccessibleAsync(int vaultId, string userId);
+    
+    // Logs
+    Task<List<VaultLogResponseDTO>> GetVaultLogsAsync(int vaultId, string userId);
 }
 

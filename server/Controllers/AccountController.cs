@@ -67,12 +67,12 @@ public class AccountController : ControllerBase
         // Create user (Identity handles persistence)
         var createResult = await _userManager.CreateAsync(user, dto.Password);
         if (!createResult.Succeeded)
-            return StatusCode(500, createResult.Errors.Select(e => e.Description));
+            return BadRequest(createResult.Errors.Select(e => e.Description));
 
         // Add role
         var roleResult = await _userManager.AddToRoleAsync(user, "User");
         if (!roleResult.Succeeded)
-            return StatusCode(500, roleResult.Errors.Select(e => e.Description));
+            return BadRequest(roleResult.Errors.Select(e => e.Description));
 
         // Device creation
         var deviceIdentifier = GetOrCreateDeviceId();
@@ -119,6 +119,17 @@ public class AccountController : ControllerBase
         {
             return StatusCode(500, "Failed to send email");
         }
+
+        // Log account activity
+        var accountLog = new AccountLog
+        {
+            UserId = user.Id,
+            Action = "Register",
+            Timestamp = DateTime.UtcNow,
+            AdditionalContext = "Account created successfully"
+        };
+        _dbContext.AccountLogs.Add(accountLog);
+        await _dbContext.SaveChangesAsync();
 
         return Ok(new
         {
@@ -215,22 +226,32 @@ public class AccountController : ControllerBase
             return Unauthorized($"Account is locked out. Lockout end: {user.LockoutEnd.Value.ToLocalTime()}");
         }
 
-        // Only generate refresh token if "Remember Me" is checked
+        // Always generate refresh token
+        var refreshTokenValue = _tokenService.CreateRefreshToken();
+        DateTime expiresAt;
+        
         if (dto.RememberMe)
         {
-            var refreshTokenValue = _tokenService.CreateRefreshToken();
-            var refreshToken = new RefreshToken
-            {
-                Token = refreshTokenValue,
-                UserDeviceId = device.Id,
-                ExpiresAt = DateTime.UtcNow.AddDays(int.Parse(_config["Jwt:RefreshTokenDays"])),
-                Revoked = false
-            };
-            
-            _dbContext.RefreshTokens.Add(refreshToken);
-            await _dbContext.SaveChangesAsync();
-            SetRefreshCookie(refreshToken);
+            // Persistent cookie: expires in configured days
+            expiresAt = DateTime.UtcNow.AddDays(int.Parse(_config["Jwt:RefreshTokenDays"]));
         }
+        else
+        {
+            // Session cookie: 24 hours in database for security, but cookie has no Expires (browser deletes on close)
+            expiresAt = DateTime.UtcNow.AddHours(24);
+        }
+        
+        var refreshToken = new RefreshToken
+        {
+            Token = refreshTokenValue,
+            UserDeviceId = device.Id,
+            ExpiresAt = expiresAt,
+            Revoked = false
+        };
+        
+        _dbContext.RefreshTokens.Add(refreshToken);
+        await _dbContext.SaveChangesAsync();
+        SetRefreshCookie(refreshToken, dto.RememberMe);
 
         // Accept invite if provided
         if (!string.IsNullOrEmpty(dto.InviteToken))
@@ -245,6 +266,17 @@ public class AccountController : ControllerBase
                 // User can accept invite later
             }
         }
+
+        // Log account activity
+        var accountLog = new AccountLog
+        {
+            UserId = user.Id,
+            Action = "Login",
+            Timestamp = DateTime.UtcNow,
+            AdditionalContext = $"Logged in from device: {device.DeviceIdentifier}"
+        };
+        _dbContext.AccountLogs.Add(accountLog);
+        await _dbContext.SaveChangesAsync();
         
         return Ok(
             new
@@ -297,21 +329,36 @@ public class AccountController : ControllerBase
         refreshToken.Revoked = true;
 
         var newTokenValue = _tokenService.CreateRefreshToken();
+        
+        // Determine expiration based on original token
+        // If original expires in more than 24 hours, it was a "Remember Me" token
+        DateTime newExpiresAt;
+        bool isPersistent;
+        if (refreshToken.ExpiresAt > DateTime.UtcNow.AddHours(24))
+        {
+            // Original was persistent, keep it persistent
+            newExpiresAt = DateTime.UtcNow.AddDays(int.Parse(_config["Jwt:RefreshTokenDays"]!));
+            isPersistent = true;
+        }
+        else
+        {
+            // Original was session cookie, keep it as session cookie
+            newExpiresAt = DateTime.UtcNow.AddHours(24);
+            isPersistent = false;
+        }
 
         var newRefreshToken = new RefreshToken
         {
             Token = newTokenValue,
             UserDeviceId = refreshToken.UserDeviceId,
-            ExpiresAt = DateTime.UtcNow.AddDays(
-                int.Parse(_config["Jwt:RefreshTokenDays"]!)
-            ),
+            ExpiresAt = newExpiresAt,
             Revoked = false
         };
 
         _dbContext.RefreshTokens.Add(newRefreshToken);
         await _dbContext.SaveChangesAsync();
 
-        SetRefreshCookie(newRefreshToken);
+        SetRefreshCookie(newRefreshToken, isPersistent);
 
         return Ok(new
         {
@@ -358,6 +405,16 @@ public class AccountController : ControllerBase
                     device.VerifiedAt = DateTime.UtcNow;
                     await _dbContext.SaveChangesAsync();
                 }
+
+                // Log account activity
+                var accountLog = new AccountLog
+                {
+                    UserId = user.Id,
+                    Action = "VerifyEmail",
+                    Timestamp = DateTime.UtcNow
+                };
+                _dbContext.AccountLogs.Add(accountLog);
+                await _dbContext.SaveChangesAsync();
                 
                 return Ok(new { Message = "Email verified successfully" });
             }
@@ -460,13 +517,39 @@ public class AccountController : ControllerBase
         device.VerifiedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync();
 
+        // Log account activity
+        var accountLog = new AccountLog
+        {
+            UserId = user.Id,
+            Action = "VerifyDevice",
+            Timestamp = DateTime.UtcNow,
+            AdditionalContext = $"Device verified: {device.DeviceIdentifier}"
+        };
+        _dbContext.AccountLogs.Add(accountLog);
+        await _dbContext.SaveChangesAsync();
+
+        // Handle invite acceptance if token is provided
+        bool inviteAccepted = false;
+        if (!string.IsNullOrEmpty(dto.InviteToken))
+        {
+            try
+            {
+                inviteAccepted = await _vaultService.AcceptInviteAsync(dto.InviteToken, user.Email!, user.Id);
+            }
+            catch
+            {
+                // Continue even if invite acceptance fails - device is still verified
+            }
+        }
+
         // Generate access token for the user
         return Ok(new
         {
             Message = "Device verified successfully",
             UserName = user.UserName,
             Email = user.Email,
-            Token = _tokenService.CreateToken(user)
+            Token = _tokenService.CreateToken(user),
+            InviteAccepted = inviteAccepted
         });
     }
 
@@ -499,6 +582,16 @@ public class AccountController : ControllerBase
         {
             return StatusCode(500, "Failed to send email");
         }
+
+        // Log account activity
+        var accountLog = new AccountLog
+        {
+            UserId = user.Id,
+            Action = "ForgotPassword",
+            Timestamp = DateTime.UtcNow
+        };
+        _dbContext.AccountLogs.Add(accountLog);
+        await _dbContext.SaveChangesAsync();
 
         return Ok(new { Message = "If the email exists, a password reset code has been sent." });
     }
@@ -581,6 +674,16 @@ public class AccountController : ControllerBase
 
             await _dbContext.SaveChangesAsync();
 
+            // Log account activity
+            var accountLog = new AccountLog
+            {
+                UserId = user.Id,
+                Action = "ResetPassword",
+                Timestamp = DateTime.UtcNow
+            };
+            _dbContext.AccountLogs.Add(accountLog);
+            await _dbContext.SaveChangesAsync();
+
             return Ok(new { message = "Password reset successfully. Please log in with your new password." });
         }
 
@@ -614,10 +717,10 @@ public class AccountController : ControllerBase
         var result = await _userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
         if (result.Succeeded)
         {
-            // Update security stamp to sign out all devices
-            await _userManager.UpdateSecurityStampAsync(user);
+            // Get current device identifier
+            var currentDeviceIdentifier = GetOrCreateDeviceId();
             
-            // Revoke all refresh tokens for security
+            // Revoke refresh tokens from all OTHER devices (keep current device active)
             var devices = await _dbContext.UserDevices
                 .Where(d => d.UserId == user.Id)
                 .Include(d => d.RefreshTokens)
@@ -625,6 +728,13 @@ public class AccountController : ControllerBase
 
             foreach (var device in devices)
             {
+                // Skip the current device - keep it active
+                if (device.DeviceIdentifier == currentDeviceIdentifier)
+                {
+                    continue;
+                }
+                
+                // Revoke all refresh tokens for other devices
                 foreach (var token in device.RefreshTokens.Where(t => !t.Revoked))
                 {
                     token.Revoked = true;
@@ -633,7 +743,18 @@ public class AccountController : ControllerBase
 
             await _dbContext.SaveChangesAsync();
 
-            return Ok(new { Message = "Password changed successfully. Please log in again." });
+            // Log account activity
+            var accountLog = new AccountLog
+            {
+                UserId = user.Id,
+                Action = "ChangePassword",
+                Timestamp = DateTime.UtcNow,
+                AdditionalContext = "Password changed successfully"
+            };
+            _dbContext.AccountLogs.Add(accountLog);
+            await _dbContext.SaveChangesAsync();
+
+            return Ok(new { Message = "Password changed successfully" });
         }
 
         return BadRequest(result.Errors.Select(e => e.Description).ToArray());
@@ -669,6 +790,17 @@ public class AccountController : ControllerBase
         // Optionally delete the device (or just mark tokens as revoked)
         // _dbContext.UserDevices.Remove(device);
 
+        await _dbContext.SaveChangesAsync();
+
+        // Log account activity
+        var accountLog = new AccountLog
+        {
+            UserId = userId,
+            Action = "RevokeDeviceAccess",
+            Timestamp = DateTime.UtcNow,
+            AdditionalContext = $"Device access revoked: {device.DeviceIdentifier}"
+        };
+        _dbContext.AccountLogs.Add(accountLog);
         await _dbContext.SaveChangesAsync();
 
         return Ok(new { Message = "Device access revoked successfully" });
@@ -729,6 +861,271 @@ public class AccountController : ControllerBase
     }
 
     [Authorize]
+    [HttpGet("logs")]
+    public async Task<IActionResult> GetAccountLogs()
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
+                     User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        var logs = await _dbContext.AccountLogs
+            .Where(l => l.UserId == userId)
+            .OrderByDescending(l => l.Timestamp)
+            .Select(l => new
+            {
+                l.Id,
+                l.Action,
+                l.Timestamp,
+                l.AdditionalContext
+            })
+            .ToListAsync();
+
+        return Ok(logs);
+    }
+
+    [Authorize]
+    [HttpPut("profile")]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDTO dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
+                     User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+
+        var changes = new List<string>();
+
+        // Update username if provided
+        if (!string.IsNullOrEmpty(dto.Username) && dto.Username != user.UserName)
+        {
+            var existingUser = await _userManager.FindByNameAsync(dto.Username);
+            if (existingUser != null && existingUser.Id != userId)
+            {
+                return BadRequest("Username is already taken");
+            }
+            user.UserName = dto.Username;
+            changes.Add("Username");
+        }
+
+        // Update email if provided
+        if (!string.IsNullOrEmpty(dto.Email) && dto.Email != user.Email)
+        {
+            var existingUser = await _userManager.FindByEmailAsync(dto.Email);
+            if (existingUser != null && existingUser.Id != userId)
+            {
+                return BadRequest("Email is already taken");
+            }
+            user.Email = dto.Email;
+            user.EmailConfirmed = false; // Require email verification for new email
+            changes.Add("Email");
+        }
+
+        if (changes.Count == 0)
+        {
+            return Ok(new { Message = "No changes made" });
+        }
+
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            return BadRequest(result.Errors.Select(e => e.Description));
+        }
+
+        // Log account activity
+        var changeMessages = changes.Select(c => c == "Username" ? "username" : "email address");
+        var accountLog = new AccountLog
+        {
+            UserId = userId,
+            Action = "UpdateProfile",
+            Timestamp = DateTime.UtcNow,
+            AdditionalContext = $"Updated {string.Join(" and ", changeMessages)}"
+        };
+        _dbContext.AccountLogs.Add(accountLog);
+        await _dbContext.SaveChangesAsync();
+
+        // If email was changed, send verification email
+        if (changes.Contains("Email"))
+        {
+            var emailVerificationExpiration = int.Parse(_config["App:VerificationCodeExpiration:EmailVerificationMinutes"]);
+            var code = await CreateAndStoreVerificationCodeAsync(user.Id, "EmailVerification", emailVerificationExpiration);
+            try
+            {
+                var baseUrl = _config["App:BaseUrl"];
+                var verificationPath = _config["App:EmailVerificationPath"];
+                var verificationUrl = $"{baseUrl}{verificationPath}";
+                await _emailService.SendEmailConfirmationAsync(user.Email!, user.UserName!, code, verificationUrl);
+            }
+            catch
+            {
+                // Log but don't fail the update
+            }
+        }
+
+        return Ok(new { Message = "Profile updated successfully" });
+    }
+
+    [Authorize]
+    [HttpDelete("account")]
+    public async Task<IActionResult> DeleteAccount()
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
+                     User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+
+        // Step 1: Get all vaults owned by user and delete them
+        var ownedVaults = await _dbContext.Vaults
+            .Where(v => v.OwnerId == userId)
+            .Select(v => v.Id)
+            .ToListAsync();
+
+        // Delete all owned vaults (this will cascade delete items, members, invites, etc.)
+        foreach (var vaultId in ownedVaults)
+        {
+            try
+            {
+                await _vaultService.DeleteVaultAsync(vaultId, userId);
+            }
+            catch
+            {
+                // Continue with deletion even if some vaults fail
+            }
+        }
+
+        // Step 2: Delete all VaultMember records for this user (in vaults they don't own)
+        // This is necessary because VaultMember.User has Restrict constraint
+        // Note: VaultItemVisibilities will be cascade deleted when VaultMembers are deleted
+        // Owned vaults were already deleted in Step 1, so their VaultMembers are already gone
+        var allMemberRecords = await _dbContext.VaultMembers
+            .Where(m => m.UserId == userId)
+            .ToListAsync();
+
+        _dbContext.VaultMembers.RemoveRange(allMemberRecords);
+
+        // Step 2b: Cancel invites created by the user
+        // Since InviterId has Restrict, we need to handle invites
+        var invitesByUser = await _dbContext.VaultInvites
+            .Where(i => i.InviterId == userId && 
+                       (i.Status == InviteStatus.Pending || i.Status == InviteStatus.Sent))
+            .ToListAsync();
+
+        foreach (var invite in invitesByUser)
+        {
+            try
+            {
+                // Cancel pending/sent invites (they can't be transferred)
+                invite.Status = InviteStatus.Cancelled;
+            }
+            catch
+            {
+                // Continue even if some fail
+            }
+        }
+
+        // Step 3: Handle items created by the user in vaults they don't own
+        // Transfer ownership of items to the vault owner
+        var itemsCreatedByUser = await _dbContext.VaultItems
+            .Include(i => i.Vault)
+            .Where(i => i.CreatedByUserId == userId && 
+                       i.Vault.OwnerId != userId && 
+                       i.Status != ItemStatus.Deleted)
+            .ToListAsync();
+
+        // Group items by vault to log once per vault
+        var itemsByVault = itemsCreatedByUser.GroupBy(i => i.VaultId);
+
+        foreach (var vaultGroup in itemsByVault)
+        {
+            var vaultId = vaultGroup.Key;
+            var itemsInVault = vaultGroup.ToList();
+            var vaultOwnerId = itemsInVault.First().Vault.OwnerId;
+
+            foreach (var item in itemsInVault)
+            {
+                try
+                {
+                    // Transfer item creation ownership to vault owner
+                    item.CreatedByUserId = vaultOwnerId;
+                }
+                catch
+                {
+                    // Continue even if some fail
+                }
+            }
+
+            // Log vault activity for item ownership transfer
+            try
+            {
+                var deletedUser = await _userManager.FindByIdAsync(userId);
+                var deletedUserName = deletedUser?.UserName ?? deletedUser?.Email ?? "Deleted User";
+                
+                var vaultLog = new VaultLog
+                {
+                    VaultId = vaultId,
+                    UserId = vaultOwnerId, // Log as vault owner since they now own the items
+                    Action = "TransferItemOwnership",
+                    Timestamp = DateTime.UtcNow,
+                    TargetUserId = userId,
+                    AdditionalContext = $"Item ownership transferred from {deletedUserName}'s deleted account: {itemsInVault.Count} item(s) now owned by vault owner"
+                };
+                _dbContext.VaultLogs.Add(vaultLog);
+            }
+            catch
+            {
+                // Continue even if logging fails
+            }
+        }
+
+        // Step 4: Delete AccountLogs (they reference the user with Restrict)
+        var accountLogs = await _dbContext.AccountLogs
+            .Where(l => l.UserId == userId)
+            .ToListAsync();
+        _dbContext.AccountLogs.RemoveRange(accountLogs);
+
+        // Step 5: Delete VaultLogs where user is the actor (they reference the user with Restrict)
+        // Note: VaultLogs with TargetUserId will be set to null automatically (SetNull)
+        var vaultLogsByUser = await _dbContext.VaultLogs
+            .Where(l => l.UserId == userId)
+            .ToListAsync();
+        _dbContext.VaultLogs.RemoveRange(vaultLogsByUser);
+
+        // Save all changes before deleting user
+        await _dbContext.SaveChangesAsync();
+
+        // Step 6: Delete user account
+        var result = await _userManager.DeleteAsync(user);
+        if (!result.Succeeded)
+        {
+            return BadRequest(result.Errors.Select(e => e.Description));
+        }
+
+        return Ok(new { Message = "Account deleted successfully" });
+    }
+
+    [Authorize]
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {
@@ -756,6 +1153,17 @@ public class AccountController : ControllerBase
             await _dbContext.SaveChangesAsync();
         }
 
+        // Log account activity
+        var accountLog = new AccountLog
+        {
+            UserId = userId,
+            Action = "Logout",
+            Timestamp = DateTime.UtcNow,
+            AdditionalContext = $"Logged out from device: {deviceIdentifier}"
+        };
+        _dbContext.AccountLogs.Add(accountLog);
+        await _dbContext.SaveChangesAsync();
+
         // Clear refresh token cookie
         Response.Cookies.Delete("refreshToken", new CookieOptions
         {
@@ -773,16 +1181,24 @@ public class AccountController : ControllerBase
     // --------------------
 
     // Helper function to save refresh token on http cookies
-    private void SetRefreshCookie(RefreshToken token)
+    private void SetRefreshCookie(RefreshToken token, bool isPersistent = true)
     {
-        Response.Cookies.Append("refreshToken", token.Token, new CookieOptions
+        var cookieOptions = new CookieOptions
         {
             HttpOnly = true,
             Secure = true, // HTTPS only (recommended for production)
             SameSite = SameSiteMode.Lax, // Works for same-site requests (www.eloomen.com <-> api.eloomen.com)
-            Expires = token.ExpiresAt,
             Path = "/"
-        });
+        };
+        
+        // Only set Expires for persistent cookies (Remember Me checked)
+        // Session cookies (Remember Me unchecked) will be deleted when browser closes
+        if (isPersistent)
+        {
+            cookieOptions.Expires = token.ExpiresAt;
+        }
+        
+        Response.Cookies.Append("refreshToken", token.Token, cookieOptions);
     }
     
     // Helper methods for verification codes

@@ -11,9 +11,7 @@ public class VaultInviteResponseDTO
     public string InviteeEmail { get; set; } = string.Empty;
     public string? InviteeId { get; set; }
     public Privilege Privilege { get; set; }
-    public InviteType InviteType { get; set; }
     public InviteStatus Status { get; set; }
-    public DateTime? SentAt { get; set; }
     public DateTime? ExpiresAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? AcceptedAt { get; set; }

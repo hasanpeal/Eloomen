@@ -17,6 +17,7 @@ public class ApplicationDBContext : IdentityDbContext<User>
     public DbSet<Vault> Vaults { get; set; }
     public DbSet<VaultInvite> VaultInvites { get; set; }
     public DbSet<VaultMember> VaultMembers { get; set; }
+    public DbSet<VaultPolicy> VaultPolicies { get; set; }
     public DbSet<VaultItem> VaultItems { get; set; }
     public DbSet<VaultItemVisibility> VaultItemVisibilities { get; set; }
     public DbSet<VaultDocument> VaultDocuments { get; set; }
@@ -24,6 +25,8 @@ public class ApplicationDBContext : IdentityDbContext<User>
     public DbSet<VaultNote> VaultNotes { get; set; }
     public DbSet<VaultLink> VaultLinks { get; set; }
     public DbSet<VaultCryptoWallet> VaultCryptoWallets { get; set; }
+    public DbSet<AccountLog> AccountLogs { get; set; }
+    public DbSet<VaultLog> VaultLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -180,6 +183,29 @@ public class ApplicationDBContext : IdentityDbContext<User>
                 .WithMany()
                 .HasForeignKey(e => e.RemovedById)
                 .OnDelete(DeleteBehavior.SetNull);
+            
+        });
+
+        // VaultPolicies configuration
+        builder.Entity<VaultPolicy>(entity =>
+        {
+            entity.ToTable("VaultPolicies");
+            entity.HasIndex(e => e.VaultId).IsUnique();
+            entity.HasIndex(e => e.PolicyType);
+            entity.HasIndex(e => e.ReleaseStatus);
+            entity.HasIndex(e => e.ReleaseDate);
+            entity.HasIndex(e => e.ExpiresAt);
+            
+            entity.HasOne(e => e.Vault)
+                .WithOne(e => e.Policy)
+                .HasForeignKey<VaultPolicy>(e => e.VaultId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+            
+            entity.HasOne(e => e.ReleasedBy)
+                .WithMany()
+                .HasForeignKey(e => e.ReleasedById)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // VaultItems configuration
@@ -316,6 +342,50 @@ public class ApplicationDBContext : IdentityDbContext<User>
                 .HasForeignKey<VaultCryptoWallet>(e => e.VaultItemId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .IsRequired();
+        });
+
+        // AccountLogs configuration
+        builder.Entity<AccountLog>(entity =>
+        {
+            entity.ToTable("AccountLogs");
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.Action);
+            entity.HasIndex(e => e.Timestamp);
+            
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired();
+        });
+
+        // VaultLogs configuration
+        builder.Entity<VaultLog>(entity =>
+        {
+            entity.ToTable("VaultLogs");
+            entity.HasIndex(e => e.VaultId);
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.TargetUserId);
+            entity.HasIndex(e => e.ItemId);
+            entity.HasIndex(e => e.Action);
+            entity.HasIndex(e => e.Timestamp);
+            
+            entity.HasOne(e => e.Vault)
+                .WithMany()
+                .HasForeignKey(e => e.VaultId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired();
+            
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired();
+            
+            entity.HasOne(e => e.TargetUser)
+                .WithMany()
+                .HasForeignKey(e => e.TargetUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 

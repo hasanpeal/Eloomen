@@ -6,5 +6,6 @@ public interface IEmailService
     Task SendDeviceVerificationAsync(string email, string username, string deviceCode, string verificationUrl);
     Task SendPasswordResetAsync(string email, string username, string resetCode, string resetUrl);
     Task SendVaultInviteAsync(string email, string inviterName, string vaultName, string inviteUrl, string privilege, string? note = null);
+    Task SendContactEmailAsync(string userName, string userEmail, string userId, string contactName, string message);
 }
 

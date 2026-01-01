@@ -35,13 +35,9 @@ public class VaultInvite
     public Privilege Privilege { get; set; }
     
     [Required]
-    public InviteType InviteType { get; set; }
-    
-    [Required]
     public InviteStatus Status { get; set; } = InviteStatus.Pending;
     
-    public DateTime? SentAt { get; set; }
-    
+    // Invite expiration (when the invite itself expires)
     public DateTime? ExpiresAt { get; set; }
     
     [Required]

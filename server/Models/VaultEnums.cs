@@ -68,3 +68,20 @@ public enum ContentFormat
     PlainText = 0
 }
 
+public enum PolicyType
+{
+    Immediate = 0,           // Released immediately upon acceptance
+    TimeBased = 1,            // Released at a specific future date
+    InactivityBased = 2,      // Requires periodic "pulse" logins
+    ExpiryBased = 3,          // Released but expires after a period
+    ManualRelease = 4         // Requires manual release by owner/admin
+}
+
+public enum ReleaseStatus
+{
+    Pending = 0,              // Not yet released
+    Released = 1,             // Currently released/accessible
+    Expired = 2,              // Expired (for expiry-based)
+    Revoked = 3               // Manually revoked
+}
+

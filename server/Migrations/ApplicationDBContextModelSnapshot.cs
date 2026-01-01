@@ -168,6 +168,41 @@ namespace server.Migrations
                     b.ToTable("UserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("server.Models.AccountLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("AdditionalContext")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Action");
+
+                    b.HasIndex("Timestamp");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AccountLogs", (string)null);
+                });
+
             modelBuilder.Entity("server.Models.RefreshToken", b =>
                 {
                     b.Property<int>("Id")
@@ -430,9 +465,6 @@ namespace server.Migrations
                     b.Property<DateTime?>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("InviteType")
-                        .HasColumnType("integer");
-
                     b.Property<string>("InviteeEmail")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -451,9 +483,6 @@ namespace server.Migrations
 
                     b.Property<int>("Privilege")
                         .HasColumnType("integer");
-
-                    b.Property<DateTime?>("SentAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -592,6 +621,56 @@ namespace server.Migrations
                     b.ToTable("VaultLinks", (string)null);
                 });
 
+            modelBuilder.Entity("server.Models.VaultLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("AdditionalContext")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("ItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TargetUserId")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("VaultId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Action");
+
+                    b.HasIndex("ItemId");
+
+                    b.HasIndex("TargetUserId");
+
+                    b.HasIndex("Timestamp");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("VaultId");
+
+                    b.ToTable("VaultLogs", (string)null);
+                });
+
             modelBuilder.Entity("server.Models.VaultMember", b =>
                 {
                     b.Property<int>("Id")
@@ -685,6 +764,60 @@ namespace server.Migrations
                     b.HasKey("VaultItemId");
 
                     b.ToTable("VaultPasswords", (string)null);
+                });
+
+            modelBuilder.Entity("server.Models.VaultPolicy", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("PolicyType")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ReleaseDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ReleaseStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReleasedById")
+                        .HasColumnType("text");
+
+                    b.Property<int>("VaultId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("PolicyType");
+
+                    b.HasIndex("ReleaseDate");
+
+                    b.HasIndex("ReleaseStatus");
+
+                    b.HasIndex("ReleasedById");
+
+                    b.HasIndex("VaultId")
+                        .IsUnique();
+
+                    b.ToTable("VaultPolicies", (string)null);
                 });
 
             modelBuilder.Entity("server.Models.VerificationCode", b =>
@@ -781,6 +914,17 @@ namespace server.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("server.Models.AccountLog", b =>
+                {
+                    b.HasOne("server.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("server.Models.RefreshToken", b =>
@@ -920,6 +1064,32 @@ namespace server.Migrations
                     b.Navigation("VaultItem");
                 });
 
+            modelBuilder.Entity("server.Models.VaultLog", b =>
+                {
+                    b.HasOne("server.Models.User", "TargetUser")
+                        .WithMany()
+                        .HasForeignKey("TargetUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("server.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("server.Models.Vault", "Vault")
+                        .WithMany()
+                        .HasForeignKey("VaultId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("TargetUser");
+
+                    b.Navigation("User");
+
+                    b.Navigation("Vault");
+                });
+
             modelBuilder.Entity("server.Models.VaultMember", b =>
                 {
                     b.HasOne("server.Models.User", "AddedBy")
@@ -975,6 +1145,24 @@ namespace server.Migrations
                     b.Navigation("VaultItem");
                 });
 
+            modelBuilder.Entity("server.Models.VaultPolicy", b =>
+                {
+                    b.HasOne("server.Models.User", "ReleasedBy")
+                        .WithMany()
+                        .HasForeignKey("ReleasedById")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("server.Models.Vault", "Vault")
+                        .WithOne("Policy")
+                        .HasForeignKey("server.Models.VaultPolicy", "VaultId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ReleasedBy");
+
+                    b.Navigation("Vault");
+                });
+
             modelBuilder.Entity("server.Models.VerificationCode", b =>
                 {
                     b.HasOne("server.Models.User", "User")
@@ -998,6 +1186,8 @@ namespace server.Migrations
                     b.Navigation("Items");
 
                     b.Navigation("Members");
+
+                    b.Navigation("Policy");
                 });
 
             modelBuilder.Entity("server.Models.VaultItem", b =>

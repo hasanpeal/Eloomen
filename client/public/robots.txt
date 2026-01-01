@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /account
+Disallow: /vaults/
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /verify-device
+Disallow: /accept-invite
+
+# Sitemap
+Sitemap: https://eloomen.com/sitemap.xml
+
+# Crawl-delay
+Crawl-delay: 1
+
