@@ -1,44 +1,23 @@
 "use client";
 
-interface DeleteItemModalProps {
+interface DeleteVaultModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  itemTitle: string;
-  itemType: string;
-  hasDocument?: boolean;
+  vaultName: string;
+  itemCount: number;
   loading?: boolean;
 }
 
-export default function DeleteItemModal({
+export default function DeleteVaultModal({
   isOpen,
   onClose,
   onConfirm,
-  itemTitle,
-  itemType,
-  hasDocument = false,
+  vaultName,
+  itemCount,
   loading = false,
-}: DeleteItemModalProps) {
+}: DeleteVaultModalProps) {
   if (!isOpen) return null;
-
-  const getItemTypeDisplayName = (type: string) => {
-    switch (type) {
-      case "Document":
-        return "Document";
-      case "Password":
-        return "Password";
-      case "Note":
-        return "Note";
-      case "Link":
-        return "Link";
-      case "CryptoWallet":
-        return "Crypto Wallet";
-      default:
-        return type;
-    }
-  };
-
-  const itemTypeDisplay = getItemTypeDisplayName(itemType);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -60,14 +39,11 @@ export default function DeleteItemModal({
             </svg>
           </div>
           <h3 className="text-xl font-bold text-slate-100 text-center mb-2">
-            Delete {itemTypeDisplay}?
+            Delete Vault?
           </h3>
           <p className="text-slate-400 text-center mb-4">
             Are you sure you want to delete{" "}
-            <span className="font-semibold text-slate-200">
-              &quot;{itemTitle}&quot;
-            </span>
-            ?
+            <span className="font-semibold text-slate-200">&quot;{vaultName}&quot;</span>?
           </p>
           <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
             <p className="text-red-400 text-sm text-center">
@@ -75,15 +51,13 @@ export default function DeleteItemModal({
               permanently delete:
             </p>
             <ul className="text-red-300 text-sm mt-2 space-y-1 list-disc list-inside">
-              <li>This {itemTypeDisplay.toLowerCase()} and all its data</li>
-              {hasDocument && <li>The document file stored</li>}
-              {itemType === "Password" && (
-                <li>All stored credentials and passwords</li>
-              )}
-              {itemType === "CryptoWallet" && (
-                <li>All wallet information and secrets</li>
-              )}
-              <li>All visibility permissions for this item</li>
+              <li>The vault and all its data</li>
+              <li>
+                All {itemCount} item{itemCount !== 1 ? "s" : ""} in this vault
+              </li>
+              <li>All documents stored</li>
+              <li>All member associations</li>
+              <li>All invites and policies</li>
             </ul>
           </div>
         </div>
@@ -101,7 +75,7 @@ export default function DeleteItemModal({
             disabled={loading}
             className="flex-1 px-4 py-3 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "Deleting..." : "Delete"}
+            {loading ? "Deleting..." : "Delete Vault"}
           </button>
         </div>
       </div>

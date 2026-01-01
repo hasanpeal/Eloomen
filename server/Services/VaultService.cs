@@ -16,19 +16,22 @@ public class VaultService : IVaultService
     private readonly IEmailService _emailService;
     private readonly IConfiguration _config;
     private readonly ILogger<VaultService> _logger;
+    private readonly ICloudflareR2Service _r2Service;
 
     public VaultService(
         ApplicationDBContext dbContext,
         UserManager<User> userManager,
         IEmailService emailService,
         IConfiguration config,
-        ILogger<VaultService> logger)
+        ILogger<VaultService> logger,
+        ICloudflareR2Service r2Service)
     {
         _dbContext = dbContext;
         _userManager = userManager;
         _emailService = emailService;
         _config = config;
         _logger = logger;
+        _r2Service = r2Service;
     }
 
     public async Task<VaultResponseDTO?> GetVaultByIdAsync(int vaultId, string userId)
@@ -271,6 +274,8 @@ public class VaultService : IVaultService
     public async Task<bool> DeleteVaultAsync(int vaultId, string userId)
     {
         var vault = await _dbContext.Vaults
+            .Include(v => v.Items)
+                .ThenInclude(i => i.Document)
             .FirstOrDefaultAsync(v => v.Id == vaultId);
 
         if (vault == null || vault.Status == VaultStatus.Deleted)
@@ -280,10 +285,35 @@ public class VaultService : IVaultService
         if (vault.OwnerId != userId)
             return false;
 
-        vault.Status = VaultStatus.Deleted;
-        vault.DeletedAt = DateTime.UtcNow;
+        // Delete all documents from Cloudflare R2 before deleting items
+        var itemsWithDocuments = vault.Items
+            .Where(i => i.Document != null && i.ItemType == ItemType.Document)
+            .ToList();
 
+        foreach (var item in itemsWithDocuments)
+        {
+            if (item.Document != null && !string.IsNullOrEmpty(item.Document.ObjectKey))
+            {
+                try
+                {
+                    await _r2Service.DeleteFileAsync(item.Document.ObjectKey);
+                    _logger.LogInformation("Deleted document {ObjectKey} from R2 for vault {VaultId}", 
+                        item.Document.ObjectKey, vaultId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to delete document {ObjectKey} from R2 for vault {VaultId}. Continuing with vault deletion.", 
+                        item.Document.ObjectKey, vaultId);
+                    // Continue with deletion even if R2 deletion fails
+                }
+            }
+        }
+
+        // Actually delete the vault (not archive) - cascade delete will handle items, members, invites, policy
+        _dbContext.Vaults.Remove(vault);
         await _dbContext.SaveChangesAsync();
+
+        _logger.LogInformation("Vault {VaultId} deleted by user {UserId}", vaultId, userId);
         return true;
     }
 

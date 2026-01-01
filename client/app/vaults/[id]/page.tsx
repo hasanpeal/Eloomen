@@ -19,6 +19,7 @@ import VaultItemList from "../../components/VaultItemList";
 import CreateVaultItemModal from "../../components/CreateVaultItemModal";
 import DeleteItemModal from "../../components/DeleteItemModal";
 import ViewItemModal from "../../components/ViewItemModal";
+import DeleteVaultModal from "../../components/DeleteVaultModal";
 import {
   Plus,
   ChevronDown,
@@ -55,6 +56,8 @@ export default function VaultDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteVaultModal, setShowDeleteVaultModal] = useState(false);
+  const [deletingVault, setDeletingVault] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferMember, setTransferMember] = useState<VaultMember | null>(
@@ -283,6 +286,27 @@ export default function VaultDetailPage() {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to update vault";
       toast.error(errorMessage);
+    }
+  };
+
+  const handleDeleteVault = async () => {
+    if (!vault) return;
+
+    setDeletingVault(true);
+    try {
+      await apiClient.deleteVault(vaultId);
+      toast.success("Vault deleted successfully");
+      router.push("/dashboard");
+    } catch (error: unknown) {
+      // Don't show toast for session expiration - it's already handled in API client
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to delete vault";
+      toast.error(errorMessage);
+    } finally {
+      setDeletingVault(false);
     }
   };
 
@@ -808,14 +832,22 @@ export default function VaultDetailPage() {
                 </p>
               )}
             </div>
-            {/* Only owners can edit vault */}
+            {/* Only owners can edit and delete vault */}
             {isOwner && (
-              <button
-                onClick={() => setShowEditModal(true)}
-                className="px-3 sm:px-4 py-2 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors cursor-pointer text-sm sm:text-base whitespace-nowrap"
-              >
-                Edit Vault
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowEditModal(true)}
+                  className="px-3 sm:px-4 py-2 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors cursor-pointer text-sm sm:text-base whitespace-nowrap"
+                >
+                  Edit Vault
+                </button>
+                <button
+                  onClick={() => setShowDeleteVaultModal(true)}
+                  className="px-3 sm:px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors cursor-pointer text-sm sm:text-base whitespace-nowrap"
+                >
+                  Delete Vault
+                </button>
+              </div>
             )}
           </div>
 
@@ -1857,6 +1889,7 @@ export default function VaultDetailPage() {
         }}
         itemTitle={deletingItem?.title || ""}
         itemType={deletingItem?.itemType || ""}
+        hasDocument={!!deletingItem?.document}
         loading={deleting}
       />
 
@@ -1907,6 +1940,19 @@ export default function VaultDetailPage() {
             vault.userPrivilege === "Member") &&
           viewingItem?.userPermission === "Edit"
         }
+      />
+
+      {/* Delete Vault Modal */}
+      <DeleteVaultModal
+        isOpen={showDeleteVaultModal}
+        onClose={() => {
+          setShowDeleteVaultModal(false);
+          setDeletingVault(false);
+        }}
+        onConfirm={handleDeleteVault}
+        vaultName={vault?.name || ""}
+        itemCount={items.length}
+        loading={deletingVault}
       />
     </div>
   );
