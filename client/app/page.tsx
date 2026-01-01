@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "./contexts/AuthContext";
 
+// SEO: This is a client component, but metadata is handled in layout.tsx
+// The content below is optimized for search engines with semantic HTML
+
 export default function Home() {
   const { isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
@@ -55,8 +58,8 @@ export default function Home() {
       </div>
 
       {/* Navigation */}
-      <nav className="relative container mx-auto px-6 py-6 flex items-center justify-between z-10">
-        <Link href="/" className="group">
+      <nav className="relative container mx-auto px-6 py-6 flex items-center justify-between z-10" role="navigation" aria-label="Main navigation">
+        <Link href="/" className="group" aria-label="Eloomen Home">
           <span className="text-xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
             Eloomen
           </span>
@@ -67,12 +70,14 @@ export default function Home() {
           <Link
             href="/login"
             className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
+            aria-label="Sign in to your account"
           >
             Sign In
           </Link>
           <Link
             href="/signup"
             className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:shadow-xl transition-all shadow-lg hover:shadow-indigo-500/50 transform hover:-translate-y-0.5 cursor-pointer"
+            aria-label="Create a new account"
           >
             Get Started
           </Link>
@@ -83,6 +88,7 @@ export default function Home() {
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="md:hidden p-2 text-slate-300 hover:text-indigo-400 transition-colors"
           aria-label="Toggle menu"
+          aria-expanded={isMobileMenuOpen}
         >
           {isMobileMenuOpen ? (
             <svg
@@ -123,6 +129,7 @@ export default function Home() {
                 href="/login"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="px-5 py-3 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-700/50 cursor-pointer text-center"
+                aria-label="Sign in to your account"
               >
                 Sign In
               </Link>
@@ -130,6 +137,7 @@ export default function Home() {
                 href="/signup"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="px-6 py-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:shadow-xl transition-all shadow-lg hover:shadow-indigo-500/50 cursor-pointer text-center"
+                aria-label="Create a new account"
               >
                 Get Started
               </Link>
@@ -163,26 +171,29 @@ export default function Home() {
             <Link
               href="/signup"
               className="px-8 py-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-xl font-semibold text-lg hover:shadow-2xl transition-all shadow-xl hover:shadow-indigo-500/50 transform hover:-translate-y-1 cursor-pointer"
+              aria-label="Sign up for Eloomen"
             >
               Sign Up
             </Link>
             <Link
               href="/login"
               className="px-8 py-4 bg-slate-800/80 backdrop-blur-sm text-slate-100 rounded-xl font-semibold text-lg border-2 border-slate-700 hover:border-indigo-600 transition-all shadow-lg hover:shadow-xl cursor-pointer"
+              aria-label="Sign in to Eloomen"
             >
               Sign In
             </Link>
           </div>
 
           {/* Features Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mt-20">
-            <div className="group bg-slate-800/60 backdrop-blur-md rounded-2xl p-6 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-2xl hover:-translate-y-1">
+          <section className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mt-20" aria-label="Key Features">
+            <article className="group bg-slate-800/60 backdrop-blur-md rounded-2xl p-6 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-2xl hover:-translate-y-1">
               <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
                 <svg
                   className="w-7 h-7 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  aria-hidden="true"
                 >
                   <path
                     strokeLinecap="round"
@@ -192,22 +203,23 @@ export default function Home() {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold mb-2 text-slate-100 text-left">
+              <h2 className="text-lg font-bold mb-2 text-slate-100 text-left">
                 Secure Vaults
-              </h3>
+              </h2>
               <p className="text-slate-400 text-sm leading-relaxed text-left">
                 Organize your data into custom vaults like Family, Medical,
                 Legal, and more.
               </p>
-            </div>
+            </article>
 
-            <div className="group bg-slate-800/60 backdrop-blur-md rounded-2xl p-6 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-2xl hover:-translate-y-1">
+            <article className="group bg-slate-800/60 backdrop-blur-md rounded-2xl p-6 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-2xl hover:-translate-y-1">
               <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
                 <svg
                   className="w-7 h-7 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  aria-hidden="true"
                 >
                   <path
                     strokeLinecap="round"
@@ -217,22 +229,23 @@ export default function Home() {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold mb-2 text-slate-100 text-left">
+              <h2 className="text-lg font-bold mb-2 text-slate-100 text-left">
                 Dynamic Groups
-              </h3>
+              </h2>
               <p className="text-slate-400 text-sm leading-relaxed text-left">
                 Create fully configurable relationship groups for flexible
                 sharing.
               </p>
-            </div>
+            </article>
 
-            <div className="group bg-slate-800/60 backdrop-blur-md rounded-2xl p-6 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-2xl hover:-translate-y-1">
+            <article className="group bg-slate-800/60 backdrop-blur-md rounded-2xl p-6 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-2xl hover:-translate-y-1">
               <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
                 <svg
                   className="w-7 h-7 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  aria-hidden="true"
                 >
                   <path
                     strokeLinecap="round"
@@ -242,22 +255,23 @@ export default function Home() {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold mb-2 text-slate-100 text-left">
+              <h2 className="text-lg font-bold mb-2 text-slate-100 text-left">
                 Time-Based Access
-              </h3>
+              </h2>
               <p className="text-slate-400 text-sm leading-relaxed text-left">
                 Set policies for delayed releases, inactivity triggers, and
                 expiry dates.
               </p>
-            </div>
+            </article>
 
-            <div className="group bg-slate-800/60 backdrop-blur-md rounded-2xl p-6 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-2xl hover:-translate-y-1">
+            <article className="group bg-slate-800/60 backdrop-blur-md rounded-2xl p-6 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-2xl hover:-translate-y-1">
               <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
                 <svg
                   className="w-7 h-7 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  aria-hidden="true"
                 >
                   <path
                     strokeLinecap="round"
@@ -267,23 +281,23 @@ export default function Home() {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold mb-2 text-slate-100 text-left">
+              <h2 className="text-lg font-bold mb-2 text-slate-100 text-left">
                 Any Data Type
-              </h3>
+              </h2>
               <p className="text-slate-400 text-sm leading-relaxed text-left">
                 Store documents, passwords, crypto wallets, notes, links, and
                 more.
               </p>
-            </div>
-          </div>
+            </article>
+          </section>
 
           {/* Use Cases Section */}
-          <div className="mt-24 mb-16">
+          <section className="mt-24 mb-16" aria-label="Use Cases">
             <h2 className="text-2xl md:text-5xl font-bold mb-12 text-slate-100">
               Built for Real-World Scenarios
             </h2>
             <div className="grid md:grid-cols-3 gap-6">
-              <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-xl">
+              <article className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-xl">
                 <h3 className="font-bold text-xl mb-3 text-slate-100">
                   For Families
                 </h3>
@@ -291,8 +305,8 @@ export default function Home() {
                   Parents can securely share important documents and information
                   with children, accessible at the right time.
                 </p>
-              </div>
-              <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-xl">
+              </article>
+              <article className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-xl">
                 <h3 className="font-bold text-xl mb-3 text-slate-100">
                   For Partners
                 </h3>
@@ -300,8 +314,8 @@ export default function Home() {
                   Spouses can share subscriptions, estate information, and
                   personal data with conditional access.
                 </p>
-              </div>
-              <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-xl">
+              </article>
+              <article className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-xl">
                 <h3 className="font-bold text-xl mb-3 text-slate-100">
                   For Professionals
                 </h3>
@@ -309,14 +323,14 @@ export default function Home() {
                   Patients, lawyers, and caregivers can securely access critical
                   information when needed.
                 </p>
-              </div>
+              </article>
             </div>
-          </div>
+          </section>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="relative border-t border-slate-800/50 mt-20 backdrop-blur-sm bg-slate-900/30">
+      <footer className="relative border-t border-slate-800/50 mt-20 backdrop-blur-sm bg-slate-900/30" role="contentinfo">
         <div className="container mx-auto px-6 py-8">
           <div className="flex flex-row justify-center">
             <p className="text-slate-400 text-sm">
