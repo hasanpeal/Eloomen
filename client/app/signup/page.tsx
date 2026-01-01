@@ -116,11 +116,7 @@ function SignupContent() {
         }
       } else {
         // If invite was accepted, go to vaults, otherwise login
-        if (inviteToken) {
-          router.push("/vaults");
-        } else {
-          router.push("/login");
-        }
+        router.push("/dashboard");
       }
     } catch (error) {
       const errorMessage =
@@ -194,6 +190,7 @@ function SignupContent() {
                 type="text"
                 id="username"
                 name="username"
+                autoComplete="username"
                 value={formData.username}
                 onChange={handleChange}
                 required
@@ -218,6 +215,7 @@ function SignupContent() {
                 type="email"
                 id="email"
                 name="email"
+                autoComplete="email"
                 value={formData.email}
                 onChange={handleChange}
                 required
@@ -245,6 +243,7 @@ function SignupContent() {
                   type={showPassword ? "text" : "password"}
                   id="password"
                   name="password"
+                  autoComplete="new-password"
                   value={formData.password}
                   onChange={handleChange}
                   required
@@ -307,6 +306,7 @@ function SignupContent() {
                   type={showConfirmPassword ? "text" : "password"}
                   id="confirmPassword"
                   name="confirmPassword"
+                  autoComplete="new-password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   required

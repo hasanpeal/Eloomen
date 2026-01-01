@@ -172,6 +172,19 @@ public class VaultItemService : IVaultItemService
 
         await _dbContext.SaveChangesAsync();
 
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = dto.VaultId,
+            UserId = userId,
+            Action = "CreateItem",
+            Timestamp = DateTime.UtcNow,
+            ItemId = item.Id,
+            AdditionalContext = $"Title: {item.Title}, ItemType: {dto.ItemType}"
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
+
         return await GetItemByIdAsync(item.Id, userId) ?? throw new InvalidOperationException("Failed to retrieve created item");
     }
 
@@ -227,12 +240,25 @@ public class VaultItemService : IVaultItemService
                 break;
         }
 
-        // Update visibility if provided - only creator can update permissions
-        if (dto.Visibilities != null && item.CreatedByUserId == userId)
+        // Update visibility if provided - user must have Edit permission to update permissions
+        if (dto.Visibilities != null && dto.Visibilities.Any())
         {
             await UpdateItemVisibilitiesAsync(itemId, dto.Visibilities, item.VaultId, userId);
         }
 
+        await _dbContext.SaveChangesAsync();
+
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = item.VaultId,
+            UserId = userId,
+            Action = "UpdateItem",
+            Timestamp = DateTime.UtcNow,
+            ItemId = itemId,
+            AdditionalContext = $"Title: {item.Title}"
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
         await _dbContext.SaveChangesAsync();
 
         return await GetItemByIdAsync(itemId, userId);
@@ -268,6 +294,20 @@ public class VaultItemService : IVaultItemService
         }
 
         await _dbContext.SaveChangesAsync();
+
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = item.VaultId,
+            UserId = userId,
+            Action = "DeleteItem",
+            Timestamp = DateTime.UtcNow,
+            ItemId = itemId,
+            AdditionalContext = $"Title: {item.Title}"
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
+
         return true;
     }
 
@@ -298,6 +338,20 @@ public class VaultItemService : IVaultItemService
         item.UpdatedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync();
+
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = item.VaultId,
+            UserId = userId,
+            Action = "RestoreItem",
+            Timestamp = DateTime.UtcNow,
+            ItemId = itemId,
+            AdditionalContext = $"Title: {item.Title}"
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
+
         return true;
     }
 
@@ -329,9 +383,18 @@ public class VaultItemService : IVaultItemService
     // Helper methods
     private async Task<string> GetVaultEncryptionKeyAsync(int vaultId, string userId)
     {
-        // In production, this should derive from user's master key
-        // For now, using a vault-specific key derived from vault ID and user ID
-        var keyMaterial = $"{vaultId}_{userId}_{_configuration["Jwt:SigningKey"]}";
+        // Get vault owner ID to ensure all users in the vault use the same encryption key
+        // This allows items created by any member to be decrypted by all authorized users
+        var vault = await _dbContext.Vaults
+            .AsNoTracking()
+            .FirstOrDefaultAsync(v => v.Id == vaultId);
+        
+        if (vault == null)
+            throw new InvalidOperationException($"Vault {vaultId} not found");
+
+        // Use vault owner's ID to derive the encryption key
+        // This ensures all items in the vault are encrypted/decrypted with the same key
+        var keyMaterial = $"{vaultId}_{vault.OwnerId}_{_configuration["Jwt:SigningKey"]}";
         using var sha256 = SHA256.Create();
         var hash = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(keyMaterial));
         return Convert.ToBase64String(hash);
@@ -429,6 +492,14 @@ public class VaultItemService : IVaultItemService
             await _dbContext.SaveChangesAsync();
         }
 
+        // Get vault to find owner
+        var vault = await _dbContext.Vaults
+            .AsNoTracking()
+            .FirstOrDefaultAsync(v => v.Id == vaultId);
+        
+        if (vault == null)
+            throw new InvalidOperationException($"Vault {vaultId} not found");
+
         // Get all active members to ensure everyone has a visibility record
         var allMembers = await _dbContext.VaultMembers
             .Where(m => m.VaultId == vaultId && m.Status == MemberStatus.Active)
@@ -451,10 +522,19 @@ public class VaultItemService : IVaultItemService
         var recordsAdded = 0;
         foreach (var member in allMembers)
         {
-            // Use provided permission if available, otherwise default (creator gets Edit, others get View)
-            var permission = visibilityDict.ContainsKey(member.Id) 
-                ? visibilityDict[member.Id]
-                : (member.UserId == userId ? ItemPermission.Edit : ItemPermission.View);
+            // Owner always gets Edit permission, regardless of what's provided
+            ItemPermission permission;
+            if (member.UserId == vault.OwnerId)
+            {
+                permission = ItemPermission.Edit;
+            }
+            else
+            {
+                // Use provided permission if available, otherwise default (creator gets Edit, others get View)
+                permission = visibilityDict.ContainsKey(member.Id) 
+                    ? visibilityDict[member.Id]
+                    : (member.UserId == userId ? ItemPermission.Edit : ItemPermission.View);
+            }
 
             var itemVisibility = new VaultItemVisibility
             {
@@ -474,6 +554,14 @@ public class VaultItemService : IVaultItemService
 
     private async Task SetDefaultVisibilitiesAsync(int itemId, int vaultId, string userId)
     {
+        // Get vault to find owner
+        var vault = await _dbContext.Vaults
+            .AsNoTracking()
+            .FirstOrDefaultAsync(v => v.Id == vaultId);
+        
+        if (vault == null)
+            throw new InvalidOperationException($"Vault {vaultId} not found");
+
         // Get all active members of the vault
         var members = await _dbContext.VaultMembers
             .Where(m => m.VaultId == vaultId && m.Status == MemberStatus.Active)
@@ -481,8 +569,10 @@ public class VaultItemService : IVaultItemService
 
         foreach (var member in members)
         {
-            // Creator gets Edit, others get View
-            var permission = member.UserId == userId ? ItemPermission.Edit : ItemPermission.View;
+            // Owner always gets Edit, creator gets Edit, others get View
+            var permission = (member.UserId == vault.OwnerId || member.UserId == userId) 
+                ? ItemPermission.Edit 
+                : ItemPermission.View;
             var visibility = new VaultItemVisibility
             {
                 VaultItemId = itemId,
@@ -600,6 +690,14 @@ public class VaultItemService : IVaultItemService
 
     private async Task<ItemPermission?> GetUserPermissionForItemAsync(VaultItem item, string userId)
     {
+        // Check if user is the vault owner - owners always have Edit permission
+        var vault = await _dbContext.Vaults
+            .AsNoTracking()
+            .FirstOrDefaultAsync(v => v.Id == item.VaultId);
+        
+        if (vault != null && vault.OwnerId == userId)
+            return ItemPermission.Edit;
+
         // First, check if user is a member of the vault
         var member = await _dbContext.VaultMembers
             .FirstOrDefaultAsync(m => m.VaultId == item.VaultId && m.UserId == userId && m.Status == MemberStatus.Active);

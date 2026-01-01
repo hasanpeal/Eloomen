@@ -352,23 +352,27 @@ class ApiClient {
 
   async verifyDevice(
     usernameOrEmail: string,
-    code: string
+    code: string,
+    inviteToken?: string
   ): Promise<{
     message: string;
     userName?: string;
     email?: string;
     token?: string;
+    inviteAccepted?: boolean;
   }> {
     const response = await this.request<{
       message: string;
       userName?: string;
       email?: string;
       token?: string;
+      inviteAccepted?: boolean;
     }>("/account/verify-device", {
       method: "POST",
       body: JSON.stringify({
         UsernameOrEmail: usernameOrEmail,
         Code: code,
+        InviteToken: inviteToken || undefined,
       }),
     });
 
@@ -434,6 +438,53 @@ class ApiClient {
   async getCurrentUser(): Promise<{ username: string; email: string }> {
     return this.request<{ username: string; email: string }>("/account/user", {
       method: "GET",
+    });
+  }
+
+  async getUserDevices(): Promise<UserDevice[]> {
+    return this.request<UserDevice[]>("/account/devices", {
+      method: "GET",
+    });
+  }
+
+  async revokeDevice(deviceId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/account/device/${deviceId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getAccountLogs(): Promise<AccountLog[]> {
+    return this.request<AccountLog[]>("/account/logs", {
+      method: "GET",
+    });
+  }
+
+  async updateProfile(data: {
+    username?: string;
+    email?: string;
+  }): Promise<{ message: string }> {
+    return this.request<{ message: string }>("/account/profile", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAccount(): Promise<{ message: string }> {
+    return this.request<{ message: string }>("/account/account", {
+      method: "DELETE",
+    });
+  }
+
+  async changePassword(
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ message: string }> {
+    return this.request<{ message: string }>("/account/change-password", {
+      method: "POST",
+      body: JSON.stringify({
+        CurrentPassword: currentPassword,
+        NewPassword: newPassword,
+      }),
     });
   }
 
@@ -543,6 +594,12 @@ class ApiClient {
   // Member methods
   async getVaultMembers(vaultId: number): Promise<VaultMember[]> {
     return this.request<VaultMember[]>(`/vault/${vaultId}/members`, {
+      method: "GET",
+    });
+  }
+
+  async getVaultLogs(vaultId: number): Promise<VaultLog[]> {
+    return this.request<VaultLog[]>(`/vault/${vaultId}/logs`, {
       method: "GET",
     });
   }
@@ -899,6 +956,21 @@ export interface VaultMember {
   removedAt?: string;
 }
 
+export interface VaultLog {
+  id: number;
+  vaultId: number;
+  userId: string;
+  userEmail?: string;
+  userName?: string;
+  targetUserId?: string;
+  targetUserEmail?: string;
+  targetUserName?: string;
+  itemId?: number;
+  action: string;
+  timestamp: string;
+  additionalContext?: string;
+}
+
 export interface VaultPolicy {
   policyType: "Immediate" | "TimeBased" | "ExpiryBased" | "ManualRelease";
   releaseStatus: "Pending" | "Released" | "Expired" | "Revoked";
@@ -1082,6 +1154,22 @@ export interface UpdateVaultItemRequest {
 export interface ItemVisibilityRequest {
   vaultMemberId: number;
   permission: ItemPermission;
+}
+
+export interface UserDevice {
+  id: number;
+  deviceIdentifier: string;
+  isVerified: boolean;
+  verifiedAt?: string;
+  createdAt: string;
+  activeTokens: number;
+}
+
+export interface AccountLog {
+  id: number;
+  action: string;
+  timestamp: string;
+  additionalContext?: string;
 }
 
 export const apiClient = new ApiClient();

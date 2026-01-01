@@ -286,5 +286,26 @@ public class VaultController : ControllerBase
 
         return Ok(new { message = "Vault released successfully" });
     }
+
+    // Logs
+    [HttpGet("{id}/logs")]
+    public async Task<ActionResult<List<VaultLogResponseDTO>>> GetVaultLogs(int id)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var logs = await _vaultService.GetVaultLogsAsync(id, userId);
+            return Ok(logs);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting vault logs for vault {VaultId}: {Message}", id, ex.Message);
+            return StatusCode(500, new { message = "Failed to retrieve vault logs. Please try again." });
+        }
+    }
 }
 

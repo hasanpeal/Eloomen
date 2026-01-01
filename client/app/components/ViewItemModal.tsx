@@ -361,7 +361,7 @@ export default function ViewItemModal({
         <div className="flex gap-3 pt-6 border-t border-slate-700/50">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors"
+            className="flex-1 px-4 py-2 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors cursor-pointer"
           >
             Close
           </button>
@@ -372,7 +372,7 @@ export default function ViewItemModal({
                   onClose();
                   onEdit?.();
                 }}
-                className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+                className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer"
               >
                 Edit
               </button>
@@ -381,7 +381,7 @@ export default function ViewItemModal({
                   onClose();
                   onDelete?.();
                 }}
-                className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors"
+                className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors cursor-pointer"
               >
                 Delete
               </button>

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -79,12 +80,25 @@ public class VaultItemController : ControllerBase
                 {
                     try
                     {
-                        dto.Visibilities = JsonSerializer.Deserialize<List<ItemVisibilityDTO>>(visibilitiesJson);
+                        var options = new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true,
+                            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                            Converters = { new JsonStringEnumConverter(namingPolicy: null) }
+                        };
+                        dto.Visibilities = JsonSerializer.Deserialize<List<ItemVisibilityDTO>>(visibilitiesJson, options);
                         _logger.LogInformation("Deserialized {Count} visibility entries for vault {VaultId}", dto.Visibilities?.Count ?? 0, vaultId);
+                        if (dto.Visibilities != null)
+                        {
+                            foreach (var v in dto.Visibilities)
+                            {
+                                _logger.LogInformation("Visibility: VaultMemberId={VaultMemberId}, Permission={Permission}", v.VaultMemberId, v.Permission);
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed to deserialize visibilities JSON for vault {VaultId}", vaultId);
+                        _logger.LogError(ex, "Failed to deserialize visibilities JSON for vault {VaultId}: {Error}", vaultId, ex.Message);
                     }
                 }
             }
@@ -127,10 +141,36 @@ public class VaultItemController : ControllerBase
             if (Request.Form.ContainsKey("visibilities"))
             {
                 var visibilitiesJson = Request.Form["visibilities"].ToString();
+                _logger.LogInformation("Received visibilities JSON for update item {ItemId} in vault {VaultId}: {Json}", itemId, vaultId, visibilitiesJson);
                 if (!string.IsNullOrEmpty(visibilitiesJson))
                 {
-                    dto.Visibilities = JsonSerializer.Deserialize<List<ItemVisibilityDTO>>(visibilitiesJson);
+                    try
+                    {
+                        var options = new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true,
+                            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                            Converters = { new JsonStringEnumConverter(namingPolicy: null) }
+                        };
+                        dto.Visibilities = JsonSerializer.Deserialize<List<ItemVisibilityDTO>>(visibilitiesJson, options);
+                        _logger.LogInformation("Deserialized {Count} visibility entries for update item {ItemId}", dto.Visibilities?.Count ?? 0, itemId);
+                        if (dto.Visibilities != null)
+                        {
+                            foreach (var v in dto.Visibilities)
+                            {
+                                _logger.LogInformation("Visibility: VaultMemberId={VaultMemberId}, Permission={Permission}", v.VaultMemberId, v.Permission);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to deserialize visibilities JSON for update item {ItemId}: {Error}", itemId, ex.Message);
+                    }
                 }
+            }
+            else
+            {
+                _logger.LogWarning("No visibilities found in form data for update item {ItemId} in vault {VaultId}", itemId, vaultId);
             }
 
             if (!ModelState.IsValid)

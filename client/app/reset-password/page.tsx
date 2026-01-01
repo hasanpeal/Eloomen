@@ -153,6 +153,7 @@ function ResetPasswordContent() {
                   type="email"
                   id="email"
                   name="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -172,6 +173,7 @@ function ResetPasswordContent() {
                 <input
                   type="text"
                   id="code"
+                  autoComplete="one-time-code"
                   value={code}
                   onChange={(e) =>
                     setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
@@ -197,6 +199,7 @@ function ResetPasswordContent() {
                   <input
                     type={showPassword ? "text" : "password"}
                     id="newPassword"
+                    autoComplete="new-password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     required
@@ -259,6 +262,7 @@ function ResetPasswordContent() {
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     id="confirmPassword"
+                    autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required

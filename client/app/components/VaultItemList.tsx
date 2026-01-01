@@ -74,7 +74,7 @@ export default function VaultItemList({
                     e.stopPropagation();
                     onView?.(item);
                   }}
-                  className="px-2 sm:px-3 py-1 text-xs bg-slate-700 text-slate-200 rounded hover:bg-slate-600 transition-colors whitespace-nowrap"
+                  className="px-2 sm:px-3 py-1 text-xs bg-slate-700 text-slate-200 rounded hover:bg-slate-600 transition-colors whitespace-nowrap cursor-pointer"
                   title="View"
                 >
                   View
@@ -87,7 +87,7 @@ export default function VaultItemList({
                       e.stopPropagation();
                       onEdit?.(item);
                     }}
-                    className="px-2 sm:px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                    className="px-2 sm:px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors whitespace-nowrap cursor-pointer"
                     title="Edit"
                   >
                     Edit
@@ -97,7 +97,7 @@ export default function VaultItemList({
                       e.stopPropagation();
                       onDelete?.(item);
                     }}
-                    className="px-2 sm:px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors whitespace-nowrap"
+                    className="px-2 sm:px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors whitespace-nowrap cursor-pointer"
                     title="Delete"
                   >
                     Delete

@@ -10,6 +10,7 @@ import {
   VaultMember,
   VaultInvite,
   VaultItem,
+  VaultLog,
   CreateInviteRequest,
   CreateVaultRequest,
   SessionExpiredError,
@@ -30,6 +31,23 @@ import {
   Crown,
   ShieldCheck,
   User,
+  History,
+  FileText,
+  Key,
+  StickyNote,
+  Link as LinkIcon,
+  Wallet,
+  Mail,
+  UserPlus,
+  UserMinus,
+  UserX,
+  Trash2,
+  RotateCcw,
+  Send,
+  X,
+  Edit,
+  Shield,
+  ArrowRight,
 } from "lucide-react";
 
 type Tab = "items" | "members" | "invites" | "history" | "about";
@@ -44,6 +62,9 @@ export default function VaultDetailPage() {
   const [members, setMembers] = useState<VaultMember[]>([]);
   const [invites, setInvites] = useState<VaultInvite[]>([]);
   const [items, setItems] = useState<VaultItem[]>([]);
+  const [logs, setLogs] = useState<VaultLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsLoaded, setLogsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("items");
@@ -86,6 +107,39 @@ export default function VaultDetailPage() {
       router.push("/login");
     }
   }, [isLoading, isAuthenticated, router]);
+
+  const loadVaultLogs = useCallback(async () => {
+    if (!vault || logsLoading) return;
+    try {
+      setLogsLoading(true);
+      const logsData = await apiClient.getVaultLogs(vaultId);
+      setLogs(logsData || []);
+      setLogsLoaded(true);
+    } catch (error) {
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to load vault logs";
+      toast.error(errorMessage);
+      setLogs([]);
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [vaultId, vault, logsLoading]);
+
+  // Reset logs when vault changes
+  useEffect(() => {
+    setLogs([]);
+    setLogsLoaded(false);
+  }, [vaultId]);
+
+  useEffect(() => {
+    if (activeTab === "history" && vault && !logsLoaded && !logsLoading) {
+      loadVaultLogs();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, vault, logsLoaded, logsLoading]);
 
   const loadVaultData = useCallback(async () => {
     try {
@@ -433,7 +487,7 @@ export default function VaultDetailPage() {
     try {
       await apiClient.leaveVault(vaultId);
       toast.success("Left vault successfully");
-      router.push("/vaults");
+      router.push("/dashboard");
     } catch (error) {
       if (error instanceof SessionExpiredError) {
         return;
@@ -642,8 +696,8 @@ export default function VaultDetailPage() {
 
   // Helper function to check if vault is accessible and get access message
   const getVaultAccessInfo = () => {
-    // Owner always has access
-    if (isOwner) {
+    // Owner and Admin always have access
+    if (isOwner || isAdmin) {
       return { hasAccess: true, message: null };
     }
 
@@ -713,8 +767,8 @@ export default function VaultDetailPage() {
 
   const accessInfo = getVaultAccessInfo();
 
-  // If vault is not accessible for non-owners, show access denied message instead of vault content
-  if (!accessInfo.hasAccess && !isOwner) {
+  // If vault is not accessible for non-owners/admins, show access denied message instead of vault content
+  if (!accessInfo.hasAccess && !canEdit) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50">
         {/* Navigation */}
@@ -855,7 +909,7 @@ export default function VaultDetailPage() {
           <div className="border-b border-slate-700/50 mb-6">
             {/* Desktop Tabs */}
             <div className="hidden md:flex space-x-6">
-              {(isOwner
+              {(canEdit
                 ? [
                     "items",
                     "members",
@@ -883,7 +937,7 @@ export default function VaultDetailPage() {
             <div className="md:hidden relative">
               <button
                 onClick={() => setIsTabDropdownOpen(!isTabDropdownOpen)}
-                className="w-full px-4 py-3 font-semibold text-slate-300 hover:text-indigo-400 transition-colors rounded-lg hover:bg-slate-700/50 flex items-center justify-between"
+                className="w-full px-4 py-3 font-semibold text-slate-300 hover:text-indigo-400 transition-colors rounded-lg hover:bg-slate-700/50 flex items-center justify-between cursor-pointer"
               >
                 <span>
                   {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
@@ -898,7 +952,7 @@ export default function VaultDetailPage() {
               {isTabDropdownOpen && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800/95 backdrop-blur-md rounded-xl border border-slate-700/50 shadow-2xl z-50">
                   <div className="flex flex-col p-2">
-                    {(isOwner
+                    {(canEdit
                       ? [
                           "items",
                           "members",
@@ -936,8 +990,8 @@ export default function VaultDetailPage() {
                 <h2 className="text-xl md:text-2xl font-bold text-slate-100">
                   Items
                 </h2>
-                {/* Only owners can add items - vault-level policy is superior */}
-                {accessInfo.hasAccess && isOwner && (
+                {/* Owners and Admins can add items - vault-level policy is superior */}
+                {accessInfo.hasAccess && canEdit && (
                   <button
                     onClick={() => {
                       setEditingItem(undefined);
@@ -1198,22 +1252,6 @@ export default function VaultDetailPage() {
                 {invites.length === 0 ? (
                   <div className="text-center py-12">
                     <p className="text-slate-400 mb-4">No invites yet</p>
-                    {canManageMembers && (
-                      <button
-                        onClick={() => {
-                          setInviteForm({
-                            inviteeEmail: "",
-                            privilege: "Member",
-                            note: "",
-                          });
-                          setShowInviteModal(true);
-                        }}
-                        className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer flex items-center justify-center gap-2"
-                      >
-                        <Plus className="w-5 h-5" />
-                        Create Your First Invite
-                      </button>
-                    )}
                   </div>
                 ) : (
                   invites.map((invite) => (
@@ -1260,105 +1298,243 @@ export default function VaultDetailPage() {
           )}
 
           {activeTab === "history" && (
-            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-4 md:p-8 border border-slate-700/50 shadow-xl">
-              <h2 className="text-xl md:text-2xl font-bold text-slate-100 mb-6">
+            <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-4 sm:p-6 md:p-8 border border-slate-700/50 shadow-xl">
+              <h2 className="text-xl md:text-2xl font-bold text-slate-100 mb-4 sm:mb-6">
                 Vault History
               </h2>
-              <div className="space-y-4">
-                {members.length === 0 ? (
-                  <p className="text-slate-400 text-center py-8">
-                    No history available
-                  </p>
+              <div className="space-y-3 sm:space-y-4">
+                {logsLoading ? (
+                  <div className="text-center py-8 sm:py-12">
+                    <svg
+                      className="animate-spin h-6 w-6 sm:h-8 sm:w-8 text-indigo-400 mx-auto"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    <p className="mt-4 text-sm sm:text-base text-slate-400">
+                      Loading history
+                    </p>
+                  </div>
+                ) : logs.length === 0 ? (
+                  <div className="text-center py-8 sm:py-12">
+                    <History className="w-10 h-10 sm:w-12 sm:h-12 text-slate-500 mx-auto mb-4" />
+                    <p className="text-sm sm:text-base text-slate-400">
+                      No history available
+                    </p>
+                  </div>
                 ) : (
-                  members
-                    .sort((a, b) => {
-                      // Sort by most recent activity first
-                      const aTime = a.removedAt || a.leftAt || a.joinedAt;
-                      const bTime = b.removedAt || b.leftAt || b.joinedAt;
-                      return (
-                        new Date(bTime).getTime() - new Date(aTime).getTime()
-                      );
-                    })
-                    .map((member) => {
-                      let eventType = "";
-                      let eventTime = "";
-                      let eventBy = "";
-                      let eventColor = "";
+                  logs.map((log) => {
+                    const formatLogMessage = (
+                      log: VaultLog
+                    ): {
+                      message: string;
+                      icon: React.ComponentType<{ className?: string }>;
+                      color: string;
+                    } => {
+                      const userName =
+                        log.userName || log.userEmail || "Unknown";
+                      const targetUserName =
+                        log.targetUserName || log.targetUserEmail || "Unknown";
 
-                      if (member.status === "Removed" && member.removedAt) {
-                        eventType = "Removed";
-                        eventTime = member.removedAt;
-                        eventBy =
-                          member.removedByName ||
-                          member.removedByEmail ||
-                          "Unknown";
-                        eventColor = "red";
-                      } else if (member.status === "Left" && member.leftAt) {
-                        eventType = "Left";
-                        eventTime = member.leftAt;
-                        eventBy =
-                          member.userName || member.userEmail || "Unknown";
-                        eventColor = "yellow";
-                      } else if (member.status === "Active") {
-                        eventType = "Joined";
-                        eventTime = member.joinedAt;
-                        eventBy =
-                          member.addedByName || member.addedByEmail || "System";
-                        eventColor = "green";
+                      switch (log.action) {
+                        case "CreateVault":
+                          return {
+                            message: `${userName} created this vault`,
+                            icon: Plus,
+                            color: "text-green-400",
+                          };
+                        case "UpdateVault":
+                          return {
+                            message: `${userName} updated the vault`,
+                            icon: Edit,
+                            color: "text-blue-400",
+                          };
+                        case "DeleteVault":
+                          return {
+                            message: `${userName} deleted this vault`,
+                            icon: Trash2,
+                            color: "text-red-400",
+                          };
+                        case "RestoreVault":
+                          return {
+                            message: `${userName} restored this vault`,
+                            icon: RotateCcw,
+                            color: "text-green-400",
+                          };
+                        case "CreateInvite":
+                          return {
+                            message: `${userName} invited ${targetUserName}`,
+                            icon: Mail,
+                            color: "text-indigo-400",
+                          };
+                        case "CancelInvite":
+                          return {
+                            message: `${userName} cancelled invite for ${targetUserName}`,
+                            icon: X,
+                            color: "text-yellow-400",
+                          };
+                        case "ResendInvite":
+                          return {
+                            message: `${userName} resent invite to ${targetUserName}`,
+                            icon: Send,
+                            color: "text-blue-400",
+                          };
+                        case "AcceptInvite":
+                          return {
+                            message: `${userName} accepted the invite`,
+                            icon: UserPlus,
+                            color: "text-green-400",
+                          };
+                        case "RemoveMember":
+                          return {
+                            message: `${userName} removed ${targetUserName} from the vault`,
+                            icon: UserMinus,
+                            color: "text-red-400",
+                          };
+                        case "UpdateMemberPrivilege":
+                          return {
+                            message: `${userName} updated ${targetUserName}'s privilege`,
+                            icon: Shield,
+                            color: "text-blue-400",
+                          };
+                        case "TransferOwnership":
+                          return {
+                            message: `${userName} transferred ownership to ${targetUserName}`,
+                            icon: Crown,
+                            color: "text-purple-400",
+                          };
+                        case "TransferItemOwnership":
+                          return {
+                            message:
+                              log.additionalContext ||
+                              `${userName} transferred item ownership`,
+                            icon: ArrowRight,
+                            color: "text-blue-400",
+                          };
+                        case "LeaveVault":
+                          return {
+                            message: `${userName} left the vault`,
+                            icon: UserX,
+                            color: "text-yellow-400",
+                          };
+                        case "ReleaseVaultManually":
+                          return {
+                            message: `${userName} manually released the vault`,
+                            icon: Unlock,
+                            color: "text-green-400",
+                          };
+                        case "CreateItem":
+                          const itemTitle =
+                            log.additionalContext?.match(
+                              /Title: ([^,]+)/
+                            )?.[1] || "an item";
+                          const itemType =
+                            log.additionalContext?.match(
+                              /ItemType: (\w+)/
+                            )?.[1] || "";
+                          const itemIcon =
+                            itemType === "Password"
+                              ? Key
+                              : itemType === "Note"
+                              ? StickyNote
+                              : itemType === "Link"
+                              ? LinkIcon
+                              : itemType === "CryptoWallet"
+                              ? Wallet
+                              : FileText;
+                          return {
+                            message: `${userName} created ${itemTitle}`,
+                            icon: itemIcon,
+                            color: "text-green-400",
+                          };
+                        case "UpdateItem":
+                          const updateTitle =
+                            log.additionalContext?.match(
+                              /Title: ([^,]+)/
+                            )?.[1] || "an item";
+                          return {
+                            message: `${userName} updated ${updateTitle}`,
+                            icon: Edit,
+                            color: "text-blue-400",
+                          };
+                        case "DeleteItem":
+                          const deleteTitle =
+                            log.additionalContext?.match(
+                              /Title: ([^,]+)/
+                            )?.[1] || "an item";
+                          return {
+                            message: `${userName} deleted ${deleteTitle}`,
+                            icon: Trash2,
+                            color: "text-red-400",
+                          };
+                        case "RestoreItem":
+                          const restoreTitle =
+                            log.additionalContext?.match(
+                              /Title: ([^,]+)/
+                            )?.[1] || "an item";
+                          return {
+                            message: `${userName} restored ${restoreTitle}`,
+                            icon: RotateCcw,
+                            color: "text-green-400",
+                          };
+                        default:
+                          return {
+                            message: `${userName} performed ${log.action}`,
+                            icon: History,
+                            color: "text-slate-400",
+                          };
                       }
+                    };
 
-                      return (
-                        <div
-                          key={member.id}
-                          className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50"
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                            <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                              <div
-                                className={`w-3 h-3 rounded-full flex-shrink-0 mt-1.5 sm:mt-0 ${
-                                  eventColor === "green"
-                                    ? "bg-green-500"
-                                    : eventColor === "yellow"
-                                    ? "bg-yellow-500"
-                                    : "bg-red-500"
-                                }`}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-slate-100 font-semibold text-sm sm:text-base truncate">
-                                  {member.userName ||
-                                    member.userEmail ||
-                                    "Unknown"}{" "}
-                                  <span className="text-slate-400 font-normal">
-                                    • {new Date(eventTime).toLocaleDateString()}
-                                  </span>
+                    const {
+                      message,
+                      icon: Icon,
+                      color,
+                    } = formatLogMessage(log);
+
+                    return (
+                      <div
+                        key={log.id}
+                        className="bg-slate-900/50 rounded-lg p-3 sm:p-4 border border-slate-700/50"
+                      >
+                        <div className="flex items-start gap-3 sm:gap-4">
+                          <div className={`flex-shrink-0 ${color}`}>
+                            <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs sm:text-sm text-slate-100 font-medium break-words">
+                              {message}
+                            </p>
+                            {log.additionalContext &&
+                              log.action !== "CreateItem" &&
+                              log.action !== "UpdateItem" &&
+                              log.action !== "DeleteItem" &&
+                              log.action !== "RestoreItem" && (
+                                <p className="text-xs text-slate-400 mt-1 break-words">
+                                  {log.additionalContext}
                                 </p>
-                                <p className="text-slate-400 text-xs sm:text-sm">
-                                  {eventType === "Joined" && (
-                                    <>
-                                      Joined as {member.privilege} • Added by{" "}
-                                      <span className="font-medium">
-                                        {eventBy}
-                                      </span>
-                                    </>
-                                  )}
-                                  {eventType === "Removed" && (
-                                    <>
-                                      Removed from vault • Removed by{" "}
-                                      <span className="font-medium">
-                                        {eventBy}
-                                      </span>
-                                    </>
-                                  )}
-                                  {eventType === "Left" && (
-                                    <>Left the vault voluntarily</>
-                                  )}
-                                </p>
-                              </div>
-                            </div>
+                              )}
+                            <p className="text-xs text-slate-500 mt-1.5 sm:mt-2">
+                              {new Date(log.timestamp).toLocaleString()}
+                            </p>
                           </div>
                         </div>
-                      );
-                    })
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>

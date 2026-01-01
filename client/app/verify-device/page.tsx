@@ -19,8 +19,13 @@ function VerifyDeviceContent() {
 
   useEffect(() => {
     const usernameOrEmailParam = searchParams.get("usernameOrEmail");
+    const inviteTokenParam = searchParams.get("token");
     if (usernameOrEmailParam) {
       setUsernameOrEmail(usernameOrEmailParam);
+    }
+    // Store invite token for later use
+    if (inviteTokenParam) {
+      sessionStorage.setItem("pendingInviteToken", inviteTokenParam);
     }
   }, [searchParams]);
 
@@ -36,7 +41,9 @@ function VerifyDeviceContent() {
     }
 
     try {
-      const response = await apiClient.verifyDevice(usernameOrEmail, code);
+      // Get invite token from session storage or URL params
+      const inviteToken = searchParams.get("token") || sessionStorage.getItem("pendingInviteToken");
+      const response = await apiClient.verifyDevice(usernameOrEmail, code, inviteToken || undefined);
 
       if (response.token && response.userName && response.email) {
         // Update auth context with user info directly from response
@@ -46,8 +53,18 @@ function VerifyDeviceContent() {
           email: response.email,
         });
         setSuccess(true);
+        
+        // Clear pending invite token from session storage
+        if (inviteToken) {
+          sessionStorage.removeItem("pendingInviteToken");
+        }
+        
         toast.success("Device verified successfully.");
-        router.push("/dashboard");
+        
+        // Redirect based on whether invite was accepted
+        if (response.inviteAccepted) {
+          router.push("/dashboard");
+        } 
       } else {
         setError(response.message || "Verification failed. Please try again.");
       }

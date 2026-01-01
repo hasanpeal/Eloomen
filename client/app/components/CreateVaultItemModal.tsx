@@ -173,13 +173,17 @@ export default function CreateVaultItemModal({
     try {
       const { apiClient } = await import("../lib/api");
       if (editingItem) {
-        // Build visibilities array for all members
+        // Build visibilities array for all members (exclude owners - they always get Edit)
         const visibilityArray: ItemVisibilityRequest[] = [];
         visibilities.forEach((permission, memberId) => {
-          visibilityArray.push({
-            vaultMemberId: memberId,
-            permission: permission,
-          });
+          const member = members.find(m => m.id === memberId);
+          // Don't send owner visibilities - backend will automatically set them to Edit
+          if (member && member.privilege !== "Owner") {
+            visibilityArray.push({
+              vaultMemberId: memberId,
+              permission: permission,
+            });
+          }
         });
 
         const data: UpdateVaultItemRequest = {
@@ -204,13 +208,17 @@ export default function CreateVaultItemModal({
         await apiClient.updateVaultItem(vaultId, editingItem.id, data);
         toast.success("Item updated successfully");
       } else {
-        // Build visibilities array for all members
+        // Build visibilities array for all members (exclude owners - they always get Edit)
         const visibilityArray: ItemVisibilityRequest[] = [];
         visibilities.forEach((permission, memberId) => {
-          visibilityArray.push({
-            vaultMemberId: memberId,
-            permission: permission,
-          });
+          const member = members.find(m => m.id === memberId);
+          // Don't send owner visibilities - backend will automatically set them to Edit
+          if (member && member.privilege !== "Owner") {
+            visibilityArray.push({
+              vaultMemberId: memberId,
+              permission: permission,
+            });
+          }
         });
 
         console.log("Creating item with visibilities:", visibilityArray);
@@ -292,6 +300,7 @@ export default function CreateVaultItemModal({
             </label>
             <input
               type="text"
+              autoComplete="off"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -337,6 +346,7 @@ export default function CreateVaultItemModal({
                 </label>
                 <input
                   type="text"
+                  autoComplete="off"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -349,6 +359,7 @@ export default function CreateVaultItemModal({
                 </label>
                 <input
                   type="password"
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -361,6 +372,7 @@ export default function CreateVaultItemModal({
                 </label>
                 <input
                   type="url"
+                  autoComplete="off"
                   value={websiteUrl}
                   onChange={(e) => setWebsiteUrl(e.target.value)}
                   className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -406,6 +418,7 @@ export default function CreateVaultItemModal({
                 </label>
                 <input
                   type="url"
+                  autoComplete="off"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -450,6 +463,7 @@ export default function CreateVaultItemModal({
                 </label>
                 <input
                   type="text"
+                  autoComplete="off"
                   value={platformName}
                   onChange={(e) => setPlatformName(e.target.value)}
                   className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -462,6 +476,7 @@ export default function CreateVaultItemModal({
                 </label>
                 <input
                   type="text"
+                  autoComplete="off"
                   value={blockchain}
                   onChange={(e) => setBlockchain(e.target.value)}
                   className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -474,6 +489,7 @@ export default function CreateVaultItemModal({
                 </label>
                 <input
                   type="text"
+                  autoComplete="off"
                   value={publicAddress}
                   onChange={(e) => setPublicAddress(e.target.value)}
                   className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -540,19 +556,25 @@ export default function CreateVaultItemModal({
                         </span>
                       </p>
                     </div>
-                    <select
-                      value={visibilities.get(member.id) || "View"}
-                      onChange={(e) => {
-                        const newVisibilities = new Map(visibilities);
-                        const value = e.target.value as ItemPermission;
-                        newVisibilities.set(member.id, value);
-                        setVisibilities(newVisibilities);
-                      }}
-                      className="ml-4 bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    >
-                      <option value="View">View</option>
-                      <option value="Edit">Edit</option>
-                    </select>
+                    {member.privilege === "Owner" ? (
+                      <span className="ml-4 text-sm text-slate-400 italic">
+                        Always Edit
+                      </span>
+                    ) : (
+                      <select
+                        value={visibilities.get(member.id) || "View"}
+                        onChange={(e) => {
+                          const newVisibilities = new Map(visibilities);
+                          const value = e.target.value as ItemPermission;
+                          newVisibilities.set(member.id, value);
+                          setVisibilities(newVisibilities);
+                        }}
+                        className="ml-4 bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      >
+                        <option value="View">View</option>
+                        <option value="Edit">Edit</option>
+                      </select>
+                    )}
                   </div>
                 ))}
               {members.filter((m) => m.status === "Active").length === 0 && (

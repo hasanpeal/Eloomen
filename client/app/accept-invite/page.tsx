@@ -161,10 +161,10 @@ function AcceptInviteContent() {
           </h1>
           <p className="text-slate-400 mb-6">
             You&apos;ve successfully joined the vault. Redirecting to your
-            vaults...
+            vaults.
           </p>
           <Link
-            href="/vaults"
+            href="/dashboard"
             className="inline-block px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200"
           >
             Go to Vaults
@@ -185,7 +185,7 @@ function AcceptInviteContent() {
             This invite link is invalid or missing a token.
           </p>
           <Link
-            href="/vaults"
+            href="/dashboard"
             className="inline-block px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200"
           >
             Go to Vaults

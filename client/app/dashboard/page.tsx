@@ -19,7 +19,6 @@ export default function DashboardPage() {
   const [vaults, setVaults] = useState<Vault[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showAccountModal, setShowAccountModal] = useState(false);
   const [showAccessDeniedModal, setShowAccessDeniedModal] = useState(false);
   const [accessDeniedVault, setAccessDeniedVault] = useState<Vault | null>(
     null
@@ -210,7 +209,7 @@ export default function DashboardPage() {
           // Should be released by backend, but check anyway
           return {
             hasAccess: true,
-            message: "Vault is now accessible.",
+            // message: "Vault is now accessible.",
           };
         }
         return {
@@ -244,12 +243,12 @@ export default function DashboardPage() {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-4">
-          <button
-            onClick={() => setShowAccountModal(true)}
+          <Link
+            href="/account"
             className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
           >
             Account
-          </button>
+          </Link>
           <button
             onClick={handleLogout}
             className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
@@ -275,15 +274,13 @@ export default function DashboardPage() {
         {isMobileMenuOpen && (
           <div className="absolute top-full left-0 right-0 mt-2 mx-6 bg-slate-800/95 backdrop-blur-md rounded-xl border border-slate-700/50 shadow-2xl md:hidden z-50">
             <div className="flex flex-col p-4 space-y-2">
-              <button
-                onClick={() => {
-                  setShowAccountModal(true);
-                  setIsMobileMenuOpen(false);
-                }}
-                className="px-5 py-3 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-700/50 cursor-pointer text-left"
+              <Link
+                href="/account"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="px-5 py-3 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-700/50 cursor-pointer text-left block"
               >
                 Account
-              </button>
+              </Link>
               <button
                 onClick={() => {
                   handleLogout();
@@ -321,16 +318,10 @@ export default function DashboardPage() {
 
           {vaults.length === 0 ? (
             <div className="bg-slate-800/60 backdrop-blur-md rounded-3xl p-12 border border-slate-700/50 shadow-2xl text-center">
-              <p className="text-slate-400 text-lg mb-6">
+              <p className="text-slate-400 text-lg">
                 You don&apos;t have any vaults yet.
               </p>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Plus className="w-5 h-5" />
-                Create Your First Vault
-              </button>
+              
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -652,44 +643,6 @@ export default function DashboardPage() {
             >
               Close
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Account Information Modal */}
-      {showAccountModal && user && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl p-8 max-w-md w-full border border-slate-700/50 shadow-2xl">
-            <h2 className="text-2xl font-bold text-slate-100 mb-6">
-              Account Information
-            </h2>
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-semibold text-slate-400 mb-2">
-                  Username
-                </label>
-                <p className="text-lg text-slate-100 font-medium">
-                  {user.username}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-400 mb-2">
-                  Email Address
-                </label>
-                <p className="text-lg text-slate-100 font-medium">
-                  {user.email}
-                </p>
-              </div>
-            </div>
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={() => setShowAccountModal(false)}
-                className="w-full px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
           </div>
         </div>
       )}

@@ -37,5 +37,8 @@ public interface IVaultService
     Task<bool> CanManageMembersAsync(int vaultId, string userId);
     Task<bool> CanDeleteVaultAsync(int vaultId, string userId);
     Task<bool> IsVaultAccessibleAsync(int vaultId, string userId);
+    
+    // Logs
+    Task<List<VaultLogResponseDTO>> GetVaultLogsAsync(int vaultId, string userId);
 }
 

@@ -82,11 +82,7 @@ function LoginContent() {
       if (result.success) {
         toast.success("Login successful");
         // If invite was accepted, go to vaults, otherwise dashboard
-        if (inviteToken) {
-          router.push("/vaults");
-        } else {
-          router.push("/dashboard");
-        }
+        router.push("/dashboard");
       } else if (result.requiresVerification) {
         // Use verificationType from backend response
         if (result.verificationType === "Device") {
@@ -171,6 +167,7 @@ function LoginContent() {
                 type="text"
                 id="usernameOrEmail"
                 name="usernameOrEmail"
+                autoComplete="username"
                 value={formData.usernameOrEmail}
                 onChange={handleChange}
                 required
@@ -197,6 +194,7 @@ function LoginContent() {
                   type={showPassword ? "text" : "password"}
                   id="password"
                   name="password"
+                  autoComplete="current-password"
                   value={formData.password}
                   onChange={handleChange}
                   required

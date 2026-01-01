@@ -62,12 +62,17 @@ public class VaultService : IVaultService
         // Owner always has access regardless of policy
         if (!isOwner && vault.Policy != null)
         {
-            // Check general policy accessibility
-            if (!IsVaultAccessible(vault.Policy))
+            // Check general policy accessibility (this may update policy status)
+            if (!await IsVaultAccessibleAsync(vault.Policy))
             {
                 // Return null to block access - frontend will handle showing appropriate message
                 return null;
             }
+        }
+        else if (vault.Policy != null)
+        {
+            // Even for owners, check and update policy status (e.g., TimeBased release)
+            await IsVaultAccessibleAsync(vault.Policy);
         }
 
         // Get original owner info
@@ -107,6 +112,12 @@ public class VaultService : IVaultService
         {
             var isOwner = vault.OwnerId == userId;
             var privilege = await GetUserPrivilegeAsync(vault.Id, userId);
+            
+            // Check and update policy status (e.g., TimeBased release, ExpiryBased expiration)
+            if (vault.Policy != null)
+            {
+                await IsVaultAccessibleAsync(vault.Policy);
+            }
             
             // Include all vaults (even if not accessible) so users can see when they'll get access
             result.Add(new VaultResponseDTO
@@ -183,6 +194,18 @@ public class VaultService : IVaultService
         // Load policy for response
         await _dbContext.Entry(vault).Reference(v => v.Policy).LoadAsync();
 
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = vault.Id,
+            UserId = userId,
+            Action = "CreateVault",
+            Timestamp = DateTime.UtcNow,
+            AdditionalContext = $"PolicyType: {dto.PolicyType}"
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
+
         return new VaultResponseDTO
         {
             Id = vault.Id,
@@ -256,6 +279,17 @@ public class VaultService : IVaultService
         // Reload policy
         await _dbContext.Entry(vault).Reference(v => v.Policy).LoadAsync();
 
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = vault.Id,
+            UserId = userId,
+            Action = "UpdateVault",
+            Timestamp = DateTime.UtcNow
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
+
         return new VaultResponseDTO
         {
             Id = vault.Id,
@@ -309,6 +343,17 @@ public class VaultService : IVaultService
             }
         }
 
+        // Log vault activity before deletion
+        var vaultLog = new VaultLog
+        {
+            VaultId = vaultId,
+            UserId = userId,
+            Action = "DeleteVault",
+            Timestamp = DateTime.UtcNow
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
+
         // Actually delete the vault (not archive) - cascade delete will handle items, members, invites, policy
         _dbContext.Vaults.Remove(vault);
         await _dbContext.SaveChangesAsync();
@@ -337,6 +382,18 @@ public class VaultService : IVaultService
         vault.DeletedAt = null;
 
         await _dbContext.SaveChangesAsync();
+
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = vaultId,
+            UserId = userId,
+            Action = "RestoreVault",
+            Timestamp = DateTime.UtcNow
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
+
         return true;
     }
 
@@ -408,6 +465,19 @@ public class VaultService : IVaultService
             // Reload invite to get latest status
             await _dbContext.Entry(invite).ReloadAsync();
         }
+
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = vaultId,
+            UserId = inviterId,
+            Action = "CreateInvite",
+            Timestamp = DateTime.UtcNow,
+            TargetUserId = invite.InviteeId,
+            AdditionalContext = $"InviteeEmail: {dto.InviteeEmail}, Privilege: {dto.Privilege}"
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
         
         return new VaultInviteResponseDTO
         {
@@ -446,8 +516,13 @@ public class VaultService : IVaultService
         // Vault-level policy is superior - non-owners cannot access invites if policy blocks access
         if (!isOwner && vault.Policy != null)
         {
-            if (!IsVaultAccessible(vault.Policy))
+            if (!await IsVaultAccessibleAsync(vault.Policy))
                 return new List<VaultInviteResponseDTO>();
+        }
+        else if (vault.Policy != null)
+        {
+            // Even for owners, check and update policy status
+            await IsVaultAccessibleAsync(vault.Policy);
         }
 
         var invites = await _dbContext.VaultInvites
@@ -490,6 +565,19 @@ public class VaultService : IVaultService
 
         invite.Status = InviteStatus.Cancelled;
         await _dbContext.SaveChangesAsync();
+
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = invite.VaultId,
+            UserId = userId,
+            Action = "CancelInvite",
+            Timestamp = DateTime.UtcNow,
+            TargetUserId = invite.InviteeId
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
+
         return true;
     }
 
@@ -518,6 +606,19 @@ public class VaultService : IVaultService
 
         // Send email
         await SendInviteEmailAsync(invite, token);
+
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = invite.VaultId,
+            UserId = userId,
+            Action = "ResendInvite",
+            Timestamp = DateTime.UtcNow,
+            TargetUserId = invite.InviteeId
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
+
         return true;
     }
 
@@ -616,6 +717,8 @@ public class VaultService : IVaultService
         var anyExistingMember = await _dbContext.VaultMembers
             .FirstOrDefaultAsync(m => m.VaultId == invite.VaultId && m.UserId == userId);
 
+        VaultMember memberRecord;
+
         if (anyExistingMember != null)
         {
             _logger.LogInformation("Found existing member record {MemberId} for user {UserId} in vault {VaultId}. Current status: {Status}", 
@@ -625,6 +728,7 @@ public class VaultService : IVaultService
             {
                 // Already active, just mark invite as accepted
                 _logger.LogInformation("Member {UserId} is already active in vault {VaultId}", userId, invite.VaultId);
+                memberRecord = anyExistingMember;
             }
             else
             {
@@ -642,6 +746,7 @@ public class VaultService : IVaultService
                 
                 // Use Update to ensure EF tracks all changes
                 _dbContext.VaultMembers.Update(anyExistingMember);
+                memberRecord = anyExistingMember;
                 
                 _logger.LogInformation("Member {UserId} reactivated for vault {VaultId}. New status: {Status}", 
                     userId, invite.VaultId, anyExistingMember.Status);
@@ -663,6 +768,7 @@ public class VaultService : IVaultService
             };
 
             _dbContext.VaultMembers.Add(member);
+            memberRecord = member;
         }
 
         // Update invite
@@ -674,6 +780,58 @@ public class VaultService : IVaultService
         {
             await _dbContext.SaveChangesAsync();
             _logger.LogInformation("Successfully saved member changes for {UserId} in vault {VaultId}", userId, invite.VaultId);
+
+            // Log vault activity
+            var vaultLog = new VaultLog
+            {
+                VaultId = invite.VaultId,
+                UserId = userId,
+                Action = "AcceptInvite",
+                Timestamp = DateTime.UtcNow,
+                TargetUserId = invite.InviterId,
+                AdditionalContext = $"Privilege: {invite.Privilege}"
+            };
+            _dbContext.VaultLogs.Add(vaultLog);
+            await _dbContext.SaveChangesAsync();
+
+            // Step: Create VaultItemVisibility records for all existing items in the vault
+            // New members should get View permission for all existing items
+            // After SaveChangesAsync, memberRecord should have an ID (if it was newly created)
+            // Refresh from database to ensure we have the ID
+            var finalMemberRecord = await _dbContext.VaultMembers
+                .FirstOrDefaultAsync(m => m.VaultId == invite.VaultId && m.UserId == userId);
+
+            if (finalMemberRecord != null)
+            {
+                var existingItems = await _dbContext.VaultItems
+                    .Where(i => i.VaultId == invite.VaultId && i.Status == ItemStatus.Active)
+                    .ToListAsync();
+
+                if (existingItems.Any())
+                {
+                    foreach (var item in existingItems)
+                    {
+                        // Check if visibility record already exists (shouldn't happen for new members, but safe check)
+                        var existingVisibility = await _dbContext.VaultItemVisibilities
+                            .FirstOrDefaultAsync(v => v.VaultItemId == item.Id && v.VaultMemberId == finalMemberRecord.Id);
+
+                        if (existingVisibility == null)
+                        {
+                            var visibility = new VaultItemVisibility
+                            {
+                                VaultItemId = item.Id,
+                                VaultMemberId = finalMemberRecord.Id,
+                                Permission = ItemPermission.View // New members get View permission by default
+                            };
+                            _dbContext.VaultItemVisibilities.Add(visibility);
+                        }
+                    }
+                    await _dbContext.SaveChangesAsync();
+                    _logger.LogInformation("Created {Count} visibility records for new member {UserId} in vault {VaultId}", 
+                        existingItems.Count, userId, invite.VaultId);
+                }
+            }
+
             return true;
         }
         catch (Exception ex)
@@ -703,8 +861,13 @@ public class VaultService : IVaultService
         // Vault-level policy is superior - non-owners cannot access members if policy blocks access
         if (!isOwner && vault.Policy != null)
         {
-            if (!IsVaultAccessible(vault.Policy))
+            if (!await IsVaultAccessibleAsync(vault.Policy))
                 return new List<VaultMemberResponseDTO>();
+        }
+        else if (vault.Policy != null)
+        {
+            // Even for owners, check and update policy status
+            await IsVaultAccessibleAsync(vault.Policy);
         }
 
         var members = await _dbContext.VaultMembers
@@ -762,6 +925,19 @@ public class VaultService : IVaultService
         member.RemovedById = userId;
         member.RemovedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync();
+
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = vaultId,
+            UserId = userId,
+            Action = "RemoveMember",
+            Timestamp = DateTime.UtcNow,
+            TargetUserId = member.UserId
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
+
         return true;
     }
 
@@ -792,6 +968,20 @@ public class VaultService : IVaultService
 
         member.Privilege = dto.Privilege;
         await _dbContext.SaveChangesAsync();
+
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = vaultId,
+            UserId = userId,
+            Action = "UpdateMemberPrivilege",
+            Timestamp = DateTime.UtcNow,
+            TargetUserId = member.UserId,
+            AdditionalContext = $"NewPrivilege: {dto.Privilege}"
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
+
         return true;
     }
 
@@ -826,6 +1016,19 @@ public class VaultService : IVaultService
         newOwner.Privilege = Privilege.Owner;
 
         await _dbContext.SaveChangesAsync();
+
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = vaultId,
+            UserId = userId,
+            Action = "TransferOwnership",
+            Timestamp = DateTime.UtcNow,
+            TargetUserId = newOwner.UserId
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
+
         return true;
     }
 
@@ -845,6 +1048,18 @@ public class VaultService : IVaultService
         member.Status = MemberStatus.Left;
         member.LeftAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync();
+
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = vaultId,
+            UserId = userId,
+            Action = "LeaveVault",
+            Timestamp = DateTime.UtcNow
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
+
         return true;
     }
 
@@ -914,10 +1129,59 @@ public class VaultService : IVaultService
         if (vault.Policy == null)
             return true; // No policy means accessible
 
-        return IsVaultAccessible(vault.Policy);
+        return await IsVaultAccessibleAsync(vault.Policy);
     }
 
     // Helper methods
+    private async Task<bool> IsVaultAccessibleAsync(VaultPolicy policy)
+    {
+        if (policy.ReleaseStatus == ReleaseStatus.Expired || policy.ReleaseStatus == ReleaseStatus.Revoked)
+            return false;
+
+        if (policy.ReleaseStatus == ReleaseStatus.Released)
+        {
+            // Check if expired (for ExpiryBased)
+            if (policy.PolicyType == PolicyType.ExpiryBased && policy.ExpiresAt.HasValue)
+            {
+                if (DateTime.UtcNow > policy.ExpiresAt.Value)
+                {
+                    policy.ReleaseStatus = ReleaseStatus.Expired;
+                    await _dbContext.SaveChangesAsync();
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // Check if TimeBased policy should be released now
+        if (policy.PolicyType == PolicyType.TimeBased && policy.ReleaseDate.HasValue)
+        {
+            if (DateTime.UtcNow >= policy.ReleaseDate.Value)
+            {
+                policy.ReleaseStatus = ReleaseStatus.Released;
+                policy.ReleasedAt = DateTime.UtcNow;
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            return false;
+        }
+
+        // For Pending status: ManualRelease requires owner action, so non-owners cannot access
+        // TimeBased is handled above
+        if (policy.ReleaseStatus == ReleaseStatus.Pending)
+        {
+            // TimeBased is already handled above
+            // For ManualRelease, return false (not accessible until owner acts)
+            if (policy.PolicyType == PolicyType.ManualRelease)
+            {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
     private string GenerateInviteToken()
     {
         var bytes = new byte[32];
@@ -1059,60 +1323,53 @@ public class VaultService : IVaultService
         vault.Policy.ReleasedById = userId;
 
         await _dbContext.SaveChangesAsync();
+
+        // Log vault activity
+        var vaultLog = new VaultLog
+        {
+            VaultId = vaultId,
+            UserId = userId,
+            Action = "ReleaseVaultManually",
+            Timestamp = DateTime.UtcNow
+        };
+        _dbContext.VaultLogs.Add(vaultLog);
+        await _dbContext.SaveChangesAsync();
+
         return true;
     }
 
-    // Helper methods for policy
-    private bool IsVaultAccessible(VaultPolicy policy)
+    public async Task<List<VaultLogResponseDTO>> GetVaultLogsAsync(int vaultId, string userId)
     {
-        if (policy.ReleaseStatus == ReleaseStatus.Expired || policy.ReleaseStatus == ReleaseStatus.Revoked)
-            return false;
+        // Check if user has access to the vault
+        var hasAccess = await CanViewVaultAsync(vaultId, userId);
+        if (!hasAccess)
+            throw new UnauthorizedAccessException("Access denied to vault");
 
-        if (policy.ReleaseStatus == ReleaseStatus.Released)
+        var logs = await _dbContext.VaultLogs
+            .Include(l => l.User)
+            .Include(l => l.TargetUser)
+            .Where(l => l.VaultId == vaultId)
+            .OrderByDescending(l => l.Timestamp)
+            .ToListAsync();
+
+        return logs.Select(log => new VaultLogResponseDTO
         {
-            // Check if expired (for ExpiryBased)
-            if (policy.PolicyType == PolicyType.ExpiryBased && policy.ExpiresAt.HasValue)
-            {
-                if (DateTime.UtcNow > policy.ExpiresAt.Value)
-                {
-                    policy.ReleaseStatus = ReleaseStatus.Expired;
-                    // Save the change
-                    _dbContext.Entry(policy).State = Microsoft.EntityFrameworkCore.EntityState.Modified;
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        // Check if TimeBased policy should be released now
-        if (policy.PolicyType == PolicyType.TimeBased && policy.ReleaseDate.HasValue)
-        {
-            if (DateTime.UtcNow >= policy.ReleaseDate.Value)
-            {
-                policy.ReleaseStatus = ReleaseStatus.Released;
-                policy.ReleasedAt = DateTime.UtcNow;
-                // Save the change
-                _dbContext.Entry(policy).State = Microsoft.EntityFrameworkCore.EntityState.Modified;
-                return true;
-            }
-            return false;
-        }
-
-        // For Pending status: ManualRelease requires owner action, so non-owners cannot access
-        // TimeBased is handled above
-        if (policy.ReleaseStatus == ReleaseStatus.Pending)
-        {
-            // TimeBased is already handled above
-            // For ManualRelease, return false (not accessible until owner acts)
-            if (policy.PolicyType == PolicyType.ManualRelease)
-            {
-                return false;
-            }
-        }
-
-        return false;
+            Id = log.Id,
+            VaultId = log.VaultId,
+            UserId = log.UserId,
+            UserEmail = log.User?.Email,
+            UserName = log.User?.UserName,
+            TargetUserId = log.TargetUserId,
+            TargetUserEmail = log.TargetUser?.Email,
+            TargetUserName = log.TargetUser?.UserName,
+            ItemId = log.ItemId,
+            Action = log.Action,
+            Timestamp = log.Timestamp,
+            AdditionalContext = log.AdditionalContext
+        }).ToList();
     }
+
+    // Helper methods for policy
 
     private VaultPolicyResponseDTO MapPolicyToDTO(VaultPolicy policy)
     {
