@@ -96,14 +96,22 @@ export default function ViewItemModal({
       <div className="bg-slate-800 rounded-2xl p-4 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-700/50 shadow-2xl">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="flex-shrink-0">{getItemIcon(displayItem.itemType)}</div>
+            <div className="flex-shrink-0">
+              {getItemIcon(displayItem.itemType)}
+            </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-xl md:text-2xl font-bold text-slate-100 truncate">{displayItem.title}</h2>
-              <p className="text-sm text-slate-400 capitalize">{displayItem.itemType}</p>
+              <h2 className="text-xl md:text-2xl font-bold text-slate-100 truncate">
+                {displayItem.title}
+              </h2>
+              <p className="text-sm text-slate-400 capitalize">
+                {displayItem.itemType}
+              </p>
             </div>
           </div>
           {loading && (
-            <div className="text-sm text-slate-400 mb-4">Loading item details...</div>
+            <div className="text-sm text-slate-400 mb-4">
+              Loading item details...
+            </div>
           )}
           <button
             onClick={onClose}
@@ -115,7 +123,9 @@ export default function ViewItemModal({
 
         {displayItem.description && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-slate-300 mb-2">Description</h3>
+            <h3 className="text-sm font-semibold text-slate-300 mb-2">
+              Description
+            </h3>
             <p className="text-slate-400">{displayItem.description}</p>
           </div>
         )}
@@ -123,13 +133,18 @@ export default function ViewItemModal({
         {/* Document View */}
         {displayItem.itemType === "Document" && displayItem.document && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-slate-300 mb-3">Document</h3>
+            <h3 className="text-sm font-semibold text-slate-300 mb-3">
+              Document
+            </h3>
             <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <p className="text-slate-100 font-medium">{displayItem.document.originalFileName}</p>
+                  <p className="text-slate-100 font-medium">
+                    {displayItem.document.originalFileName}
+                  </p>
                   <p className="text-xs text-slate-400">
-                    {(displayItem.document.fileSize / 1024).toFixed(2)} KB • {displayItem.document.contentType}
+                    {(displayItem.document.fileSize / 1024).toFixed(2)} KB •{" "}
+                    {displayItem.document.contentType}
                   </p>
                 </div>
                 {displayItem.document.downloadUrl && (
@@ -150,7 +165,8 @@ export default function ViewItemModal({
                 )}
               </div>
               <p className="text-xs text-slate-500">
-                Uploaded: {new Date(displayItem.document.uploadedAt).toLocaleString()}
+                Uploaded:{" "}
+                {new Date(displayItem.document.uploadedAt).toLocaleString()}
               </p>
             </div>
           </div>
@@ -159,18 +175,24 @@ export default function ViewItemModal({
         {/* Password View */}
         {displayItem.itemType === "Password" && displayItem.password && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-slate-300 mb-3">Password Details</h3>
+            <h3 className="text-sm font-semibold text-slate-300 mb-3">
+              Password Details
+            </h3>
             <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50 space-y-3">
               {displayItem.password.username && (
                 <div>
                   <label className="text-xs text-slate-400">Username</label>
-                  <p className="text-slate-100 font-mono">{displayItem.password.username}</p>
+                  <p className="text-slate-100 font-mono">
+                    {displayItem.password.username}
+                  </p>
                 </div>
               )}
               {displayItem.password.password && (
                 <div>
                   <label className="text-xs text-slate-400">Password</label>
-                  <p className="text-slate-100 font-mono">{displayItem.password.password}</p>
+                  <p className="text-slate-100 font-mono">
+                    {displayItem.password.password}
+                  </p>
                 </div>
               )}
               {displayItem.password.websiteUrl && (
@@ -182,14 +204,16 @@ export default function ViewItemModal({
                     rel="noopener noreferrer"
                     className="text-indigo-400 hover:text-indigo-300"
                   >
-                    {displayItem.password.websiteUrl}
+                    <p>{displayItem.password.websiteUrl}</p>
                   </a>
                 </div>
               )}
               {displayItem.password.notes && (
                 <div>
                   <label className="text-xs text-slate-400">Notes</label>
-                  <p className="text-slate-100 whitespace-pre-wrap">{displayItem.password.notes}</p>
+                  <p className="text-slate-100 whitespace-pre-wrap">
+                    {displayItem.password.notes}
+                  </p>
                 </div>
               )}
             </div>
@@ -199,9 +223,13 @@ export default function ViewItemModal({
         {/* Note View */}
         {displayItem.itemType === "Note" && displayItem.note && (
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-slate-300 mb-3">Note Content</h3>
+            <h3 className="text-sm font-semibold text-slate-300 mb-3">
+              Note Content
+            </h3>
             <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
-              <p className="text-slate-100 whitespace-pre-wrap">{displayItem.note.content}</p>
+              <p className="text-slate-100 whitespace-pre-wrap">
+                {displayItem.note.content}
+              </p>
             </div>
           </div>
         )}
@@ -226,7 +254,9 @@ export default function ViewItemModal({
               {displayItem.link.notes && (
                 <div>
                   <label className="text-xs text-slate-400">Notes</label>
-                  <p className="text-slate-100 whitespace-pre-wrap">{displayItem.link.notes}</p>
+                  <p className="text-slate-100 whitespace-pre-wrap">
+                    {displayItem.link.notes}
+                  </p>
                 </div>
               )}
             </div>
@@ -234,71 +264,94 @@ export default function ViewItemModal({
         )}
 
         {/* CryptoWallet View */}
-        {displayItem.itemType === "CryptoWallet" && displayItem.cryptoWallet && (
-          <div className="mb-6">
-            <h3 className="text-sm font-semibold text-slate-300 mb-3">Crypto Wallet</h3>
-            <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50 space-y-3">
-              <div>
-                <label className="text-xs text-slate-400">Wallet Type</label>
-                <p className="text-slate-100 capitalize">{displayItem.cryptoWallet.walletType}</p>
-              </div>
-              {displayItem.cryptoWallet.platformName && (
+        {displayItem.itemType === "CryptoWallet" &&
+          displayItem.cryptoWallet && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-slate-300 mb-3">
+                Crypto Wallet
+              </h3>
+              <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50 space-y-3">
                 <div>
-                  <label className="text-xs text-slate-400">Platform</label>
-                  <p className="text-slate-100">{displayItem.cryptoWallet.platformName}</p>
-                </div>
-              )}
-              {displayItem.cryptoWallet.blockchain && (
-                <div>
-                  <label className="text-xs text-slate-400">Blockchain</label>
-                  <p className="text-slate-100">{displayItem.cryptoWallet.blockchain}</p>
-                </div>
-              )}
-              {displayItem.cryptoWallet.publicAddress && (
-                <div>
-                  <label className="text-xs text-slate-400">Public Address</label>
-                  <p className="text-slate-100 font-mono text-sm break-all">{displayItem.cryptoWallet.publicAddress}</p>
-                </div>
-              )}
-              {displayItem.cryptoWallet.secret && (
-                <div>
-                  <label className="text-xs text-slate-400">Secret</label>
-                  <p className="text-slate-100 font-mono text-sm break-all bg-slate-800 p-2 rounded">
-                    {displayItem.cryptoWallet.secret}
+                  <label className="text-xs text-slate-400">Wallet Type</label>
+                  <p className="text-slate-100 capitalize">
+                    {displayItem.cryptoWallet.walletType}
                   </p>
                 </div>
-              )}
-              {displayItem.cryptoWallet.notes && (
-                <div>
-                  <label className="text-xs text-slate-400">Notes</label>
-                  <p className="text-slate-100 whitespace-pre-wrap">{displayItem.cryptoWallet.notes}</p>
-                </div>
-              )}
+                {displayItem.cryptoWallet.platformName && (
+                  <div>
+                    <label className="text-xs text-slate-400">Platform</label>
+                    <p className="text-slate-100">
+                      {displayItem.cryptoWallet.platformName}
+                    </p>
+                  </div>
+                )}
+                {displayItem.cryptoWallet.blockchain && (
+                  <div>
+                    <label className="text-xs text-slate-400">Blockchain</label>
+                    <p className="text-slate-100">
+                      {displayItem.cryptoWallet.blockchain}
+                    </p>
+                  </div>
+                )}
+                {displayItem.cryptoWallet.publicAddress && (
+                  <div>
+                    <label className="text-xs text-slate-400">
+                      Public Address
+                    </label>
+                    <p className="text-slate-100 font-mono text-sm break-all">
+                      {displayItem.cryptoWallet.publicAddress}
+                    </p>
+                  </div>
+                )}
+                {displayItem.cryptoWallet.secret && (
+                  <div>
+                    <label className="text-xs text-slate-400">Secret</label>
+                    <p className="text-slate-100 font-mono text-sm break-all bg-slate-800 p-2 rounded">
+                      {displayItem.cryptoWallet.secret}
+                    </p>
+                  </div>
+                )}
+                {displayItem.cryptoWallet.notes && (
+                  <div>
+                    <label className="text-xs text-slate-400">Notes</label>
+                    <p className="text-slate-100 whitespace-pre-wrap">
+                      {displayItem.cryptoWallet.notes}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Metadata */}
         <div className="mb-6 pt-6 border-t border-slate-700/50">
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <label className="text-slate-400">Created</label>
-              <p className="text-slate-100">{new Date(displayItem.createdAt).toLocaleString()}</p>
+              <p className="text-slate-100">
+                {new Date(displayItem.createdAt).toLocaleString()}
+              </p>
             </div>
             <div>
               <label className="text-slate-400">Last Updated</label>
-              <p className="text-slate-100">{new Date(displayItem.updatedAt).toLocaleString()}</p>
+              <p className="text-slate-100">
+                {new Date(displayItem.updatedAt).toLocaleString()}
+              </p>
             </div>
             {displayItem.createdByUserName && (
               <div>
                 <label className="text-slate-400">Created By</label>
-                <p className="text-slate-100">{displayItem.createdByUserName}</p>
+                <p className="text-slate-100">
+                  {displayItem.createdByUserName}
+                </p>
               </div>
             )}
             {displayItem.userPermission && (
               <div>
                 <label className="text-slate-400">Your Permission</label>
-                <p className="text-slate-100 capitalize">{displayItem.userPermission}</p>
+                <p className="text-slate-100 capitalize">
+                  {displayItem.userPermission}
+                </p>
               </div>
             )}
           </div>

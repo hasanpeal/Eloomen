@@ -318,7 +318,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="relative border-t border-slate-800/50 mt-20 backdrop-blur-sm bg-slate-900/30">
         <div className="container mx-auto px-6 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
+          <div className="flex flex-row justify-center">
             <p className="text-slate-400 text-sm">
               © 2026 Eloomen. All rights reserved.
             </p>
