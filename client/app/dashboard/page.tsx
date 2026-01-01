@@ -12,6 +12,7 @@ import {
 } from "../lib/api";
 import toast from "react-hot-toast";
 import { Plus, Menu, X, Lock, Crown, ShieldCheck, User } from "lucide-react";
+import ContactModal from "../components/ContactModal";
 
 export default function DashboardPage() {
   const { isLoading, isAuthenticated, user, logout } = useAuth();
@@ -24,6 +25,7 @@ export default function DashboardPage() {
     null
   );
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
   const [createForm, setCreateForm] = useState<CreateVaultRequest>({
     name: "",
     description: "",
@@ -242,16 +244,22 @@ export default function DashboardPage() {
         </Link>
 
         {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center space-x-4">
+        <div className="hidden md:flex items-center gap-1">
           <Link
             href="/account"
-            className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
+            className="px-4 py-2 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
           >
             Account
           </Link>
           <button
+            onClick={() => setShowContactModal(true)}
+            className="px-4 py-2 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
+          >
+            Contact
+          </button>
+          <button
             onClick={handleLogout}
-            className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
+            className="px-4 py-2 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
           >
             Logout
           </button>
@@ -273,20 +281,29 @@ export default function DashboardPage() {
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
           <div className="absolute top-full left-0 right-0 mt-2 mx-6 bg-slate-800/95 backdrop-blur-md rounded-xl border border-slate-700/50 shadow-2xl md:hidden z-50">
-            <div className="flex flex-col p-4 space-y-2">
+            <div className="flex flex-col p-2">
               <Link
                 href="/account"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="px-5 py-3 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-700/50 cursor-pointer text-left block"
+                className="px-4 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-700/50 cursor-pointer text-left"
               >
                 Account
               </Link>
               <button
                 onClick={() => {
+                  setShowContactModal(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="px-4 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-700/50 cursor-pointer text-left"
+              >
+                Contact
+              </button>
+              <button
+                onClick={() => {
                   handleLogout();
                   setIsMobileMenuOpen(false);
                 }}
-                className="px-5 py-3 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-700/50 cursor-pointer text-left"
+                className="px-4 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-700/50 cursor-pointer text-left"
               >
                 Logout
               </button>
@@ -321,7 +338,6 @@ export default function DashboardPage() {
               <p className="text-slate-400 text-lg">
                 You don&apos;t have any vaults yet.
               </p>
-              
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -646,6 +662,12 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Contact Modal */}
+      <ContactModal
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+      />
     </div>
   );
 }

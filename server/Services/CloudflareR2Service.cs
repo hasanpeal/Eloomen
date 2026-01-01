@@ -34,8 +34,7 @@ public class CloudflareR2Service : ICloudflareR2Service
         secretAccessKey = secretAccessKey.Trim();
 
         _logger.LogInformation(
-            "Initializing Cloudflare R2 service with MinIO | Endpoint: {Endpoint} | Bucket: {Bucket}",
-            endpoint, _bucketName
+            "Initializing Cloudflare R2 service with MinIO"
         );
 
         // Don't log access key details in production

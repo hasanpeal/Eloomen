@@ -298,5 +298,76 @@ public class EmailService : IEmailService
             throw new InvalidOperationException("Failed to send vault invite email");
         }
     }
+
+    public async Task SendContactEmailAsync(string userName, string userEmail, string userId, string contactName, string message)
+    {
+        var apiKey = _config["SendGrid:ApiKey"];
+        var fromEmail = _config["SendGrid:FromEmail"];
+        var fromName = _config["SendGrid:FromName"] ?? "Eloomen";
+        var adminEmail = _config["SendGrid:AdminEmail"];
+
+        if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(fromEmail))
+        {
+            throw new InvalidOperationException("SendGrid configuration is missing");
+        }
+
+        if (string.IsNullOrEmpty(adminEmail))
+        {
+            throw new InvalidOperationException("SendGrid:AdminEmail is not configured");
+        }
+
+        var client = new SendGridClient(apiKey);
+        var from = new EmailAddress(fromEmail, fromName);
+        var to = new EmailAddress(adminEmail);
+        var subject = $"Contact Form Submission from {contactName}";
+
+        var htmlContent = $@"
+            <html>
+            <body style='font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, ""Helvetica Neue"", Arial, sans-serif; padding: 20px; background-color: #0f172a; color: #e2e8f0; margin: 0;'>
+                <div style='max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; padding: 32px; border: 1px solid #334155;'>
+                    <h2 style='color: #f1f5f9; margin-top: 0; font-size: 24px; font-weight: 600;'>New Contact Form Submission</h2>
+                    
+                    <div style='background-color: #0f172a; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #334155;'>
+                        <h3 style='color: #cbd5e1; font-size: 16px; margin-top: 0; margin-bottom: 16px; font-weight: 600;'>User Information</h3>
+                        <p style='color: #94a3b8; font-size: 14px; margin: 8px 0;'><strong style='color: #cbd5e1;'>User ID:</strong> {userId}</p>
+                        <p style='color: #94a3b8; font-size: 14px; margin: 8px 0;'><strong style='color: #cbd5e1;'>Username:</strong> {userName}</p>
+                        <p style='color: #94a3b8; font-size: 14px; margin: 8px 0;'><strong style='color: #cbd5e1;'>Email:</strong> {userEmail}</p>
+                        <p style='color: #94a3b8; font-size: 14px; margin: 8px 0;'><strong style='color: #cbd5e1;'>Contact Name:</strong> {contactName}</p>
+                    </div>
+
+                    <div style='background-color: #0f172a; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #334155;'>
+                        <h3 style='color: #cbd5e1; font-size: 16px; margin-top: 0; margin-bottom: 16px; font-weight: 600;'>Message</h3>
+                        <p style='color: #e2e8f0; font-size: 15px; line-height: 1.6; margin: 0; white-space: pre-wrap;'>{message}</p>
+                    </div>
+
+                    <p style='color: #94a3b8; font-size: 14px; margin-top: 32px; border-top: 1px solid #334155; padding-top: 20px; line-height: 1.6;'>
+                        This message was sent from the Eloomen contact form.
+                    </p>
+                </div>
+            </body>
+            </html>";
+
+        var plainTextContent = $@"
+            New Contact Form Submission
+
+            User Information:
+            User ID: {userId}
+            Username: {userName}
+            Email: {userEmail}
+            Contact Name: {contactName}
+
+            Message:
+            {message}
+
+            This message was sent from the Eloomen contact form.";
+
+        var msg = MailHelper.CreateSingleEmail(from, to, subject, plainTextContent, htmlContent);
+        var response = await client.SendEmailAsync(msg);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException("Failed to send contact email");
+        }
+    }
 }
 

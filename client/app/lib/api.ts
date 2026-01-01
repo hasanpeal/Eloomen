@@ -488,6 +488,16 @@ class ApiClient {
     });
   }
 
+  async sendContact(name: string, message: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>("/contact", {
+      method: "POST",
+      body: JSON.stringify({
+        Name: name,
+        Message: message,
+      }),
+    });
+  }
+
   isAuthenticated(): boolean {
     return !!this.getAccessToken();
   }
