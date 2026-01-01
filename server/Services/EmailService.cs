@@ -37,17 +37,25 @@ public class EmailService : IEmailService
         
         var htmlContent = $@"
             <html>
-            <body style='font-family: Arial, sans-serif; padding: 20px;'>
-                <h2>Welcome to Eloomen!</h2>
-                <p>Hi {username},</p>
-                <p>Thank you for signing up. Please verify your email address using the verification code below:</p>
-                <div style='background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 5px; margin: 20px 0;'>
-                    <h1 style='font-size: 32px; letter-spacing: 5px; color: #4CAF50; margin: 0;'>{confirmationCode}</h1>
+            <body style='font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, ""Helvetica Neue"", Arial, sans-serif; padding: 20px; background-color: #0f172a; color: #e2e8f0; margin: 0;'>
+                <div style='max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; padding: 32px; border: 1px solid #334155;'>
+                    <h2 style='color: #f1f5f9; margin-top: 0; font-size: 24px; font-weight: 600;'>Welcome to Eloomen!</h2>
+                    <p style='color: #cbd5e1; font-size: 16px; line-height: 1.6;'>Hi {username},</p>
+                    <p style='color: #cbd5e1; font-size: 16px; line-height: 1.6;'>Thank you for signing up. Please verify your email address using the verification code below:</p>
+                    
+                    <div style='background-color: #0f172a; padding: 24px; border-radius: 8px; margin: 24px 0; text-align: center; border: 1px solid #334155;'>
+                        <p style='margin: 0 0 12px 0; color: #94a3b8; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;'>Verification Code</p>
+                        <h1 style='font-size: 36px; letter-spacing: 8px; color: #10b981; margin: 0; font-weight: 700; font-family: ""Courier New"", monospace;'>{confirmationCode}</h1>
+                    </div>
+                    
+                    <div style='text-align: center; margin: 32px 0;'>
+                        <a href='{fullUrl}' style='background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);'>Verify Email</a>
+                    </div>
+                    
+                    <p style='color: #94a3b8; font-size: 14px; margin-top: 32px; border-top: 1px solid #334155; padding-top: 20px; line-height: 1.6;'>
+                        This code will expire in 24 hours. If you didn't create an account, please ignore this email.
+                    </p>
                 </div>
-                <p>Or click the link below to verify automatically:</p>
-                <p><a href='{fullUrl}' style='background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;'>Verify Email</a></p>
-                <p>This code will expire in 24 hours.</p>
-                <p>If you didn't create an account, please ignore this email.</p>
             </body>
             </html>";
 
@@ -97,17 +105,22 @@ public class EmailService : IEmailService
         
         var htmlContent = $@"
             <html>
-            <body style='font-family: Arial, sans-serif; padding: 20px;'>
-                <h2>New Device Detected</h2>
-                <p>Hi {username},</p>
-                <p>We detected a login attempt from a new device. Please verify this device using the verification code below:</p>
-                <div style='background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 5px; margin: 20px 0;'>
-                    <h1 style='font-size: 32px; letter-spacing: 5px; color: #2196F3; margin: 0;'>{deviceCode}</h1>
+            <body style='font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, ""Helvetica Neue"", Arial, sans-serif; padding: 20px; background-color: #0f172a; color: #e2e8f0; margin: 0;'>
+                <div style='max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; padding: 32px; border: 1px solid #334155;'>
+                    <h2 style='color: #f1f5f9; margin-top: 0; font-size: 24px; font-weight: 600;'>New Device Detected</h2>
+                    <p style='color: #cbd5e1; font-size: 16px; line-height: 1.6;'>Hi {username},</p>
+                    <p style='color: #cbd5e1; font-size: 16px; line-height: 1.6;'>We detected a login attempt from a new device. Please verify this device using the verification code below:</p>
+                    
+                    <div style='background-color: #0f172a; padding: 24px; border-radius: 8px; margin: 24px 0; text-align: center; border: 1px solid #334155;'>
+                        <p style='margin: 0 0 12px 0; color: #94a3b8; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;'>Device Verification Code</p>
+                        <h1 style='font-size: 36px; letter-spacing: 8px; color: #3b82f6; margin: 0; font-weight: 700; font-family: ""Courier New"", monospace;'>{deviceCode}</h1>
+                    </div>
+                    
+                    
+                    <p style='color: #94a3b8; font-size: 14px; margin-top: 32px; border-top: 1px solid #334155; padding-top: 20px; line-height: 1.6;'>
+                        This code will expire in 1 hour. If you didn't attempt to log in, please secure your account immediately.
+                    </p>
                 </div>
-                <p>Or click the link below to verify automatically:</p>
-                <p><a href='{fullUrl}' style='background-color: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;'>Verify Device</a></p>
-                <p>This code will expire in 1 hour.</p>
-                <p>If you didn't attempt to log in, please secure your account immediately.</p>
             </body>
             </html>";
 
@@ -158,17 +171,25 @@ public class EmailService : IEmailService
         
         var htmlContent = $@"
             <html>
-            <body style='font-family: Arial, sans-serif; padding: 20px;'>
-                <h2>Password Reset Request</h2>
-                <p>Hi {username},</p>
-                <p>You requested to reset your password. Please use the verification code below:</p>
-                <div style='background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 5px; margin: 20px 0;'>
-                    <h1 style='font-size: 32px; letter-spacing: 5px; color: #FF9800; margin: 0;'>{resetCode}</h1>
+            <body style='font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, ""Helvetica Neue"", Arial, sans-serif; padding: 20px; background-color: #0f172a; color: #e2e8f0; margin: 0;'>
+                <div style='max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; padding: 32px; border: 1px solid #334155;'>
+                    <h2 style='color: #f1f5f9; margin-top: 0; font-size: 24px; font-weight: 600;'>Password Reset Request</h2>
+                    <p style='color: #cbd5e1; font-size: 16px; line-height: 1.6;'>Hi {username},</p>
+                    <p style='color: #cbd5e1; font-size: 16px; line-height: 1.6;'>You requested to reset your password. Please use the verification code below:</p>
+                    
+                    <div style='background-color: #0f172a; padding: 24px; border-radius: 8px; margin: 24px 0; text-align: center; border: 1px solid #334155;'>
+                        <p style='margin: 0 0 12px 0; color: #94a3b8; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;'>Reset Code</p>
+                        <h1 style='font-size: 36px; letter-spacing: 8px; color: #f59e0b; margin: 0; font-weight: 700; font-family: ""Courier New"", monospace;'>{resetCode}</h1>
+                    </div>
+                    
+                    <div style='text-align: center; margin: 32px 0;'>
+                        <a href='{fullUrl}' style='background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3);'>Reset Password</a>
+                    </div>
+                    
+                    <p style='color: #94a3b8; font-size: 14px; margin-top: 32px; border-top: 1px solid #334155; padding-top: 20px; line-height: 1.6;'>
+                        This code will expire in 1 hour. If you didn't request a password reset, please ignore this email and your password will remain unchanged.
+                    </p>
                 </div>
-                <p>Or click the link below to reset your password automatically:</p>
-                <p><a href='{fullUrl}' style='background-color: #FF9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;'>Reset Password</a></p>
-                <p>This code will expire in 1 hour.</p>
-                <p>If you didn't request a password reset, please ignore this email and your password will remain unchanged.</p>
             </body>
             </html>";
 
@@ -230,14 +251,14 @@ public class EmailService : IEmailService
 
         var htmlContent = $@"
             <html>
-            <body style='font-family: Arial, sans-serif; padding: 20px; background-color: #0f172a; color: #e2e8f0;'>
+            <body style='font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, ""Helvetica Neue"", Arial, sans-serif; padding: 20px; background-color: #0f172a; color: #e2e8f0; margin: 0;'>
                 <div style='max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; padding: 32px; border: 1px solid #334155;'>
-                    <h2 style='color: #f1f5f9; margin-top: 0;'>Vault Invitation</h2>
-                    <p style='color: #cbd5e1; font-size: 16px;'>Hi there,</p>
-                    <p style='color: #cbd5e1; font-size: 16px;'><strong style='color: #f1f5f9;'>{inviterName}</strong> has invited you to join the vault <strong style='color: #818cf8;'>{vaultName}</strong>.</p>
+                    <h2 style='color: #f1f5f9; margin-top: 0; font-size: 24px; font-weight: 600;'>Vault Invitation</h2>
+                    <p style='color: #cbd5e1; font-size: 16px; line-height: 1.6;'>Hi there,</p>
+                    <p style='color: #cbd5e1; font-size: 16px; line-height: 1.6;'><strong style='color: #f1f5f9;'>{inviterName}</strong> has invited you to join the vault <strong style='color: #818cf8;'>{vaultName}</strong>.</p>
                     
                     <div style='background-color: #0f172a; padding: 20px; border-radius: 8px; margin: 24px 0; text-align: center; border: 1px solid #334155;'>
-                        <p style='margin: 0 0 12px 0; color: #94a3b8; font-size: 14px;'>Your Privilege Level</p>
+                        <p style='margin: 0 0 12px 0; color: #94a3b8; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;'>Your Privilege Level</p>
                         <div style='display: inline-block;'>{privilegeBadge}</div>
                     </div>
                     
@@ -247,7 +268,7 @@ public class EmailService : IEmailService
                         <a href='{inviteUrl}' style='background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);'>Accept Invitation</a>
                     </div>
                     
-                    <p style='color: #94a3b8; font-size: 14px; margin-top: 32px; border-top: 1px solid #334155; padding-top: 20px;'>
+                    <p style='color: #94a3b8; font-size: 14px; margin-top: 32px; border-top: 1px solid #334155; padding-top: 20px; line-height: 1.6;'>
                         This invitation will expire in 7 days. If you didn't expect this invitation, you can safely ignore this email.
                     </p>
                 </div>
