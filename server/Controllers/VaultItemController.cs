@@ -75,7 +75,7 @@ public class VaultItemController : ControllerBase
             if (Request.Form.ContainsKey("visibilities"))
             {
                 var visibilitiesJson = Request.Form["visibilities"].ToString();
-                _logger.LogInformation("Received visibilities JSON for vault {VaultId}: {Json}", vaultId, visibilitiesJson);
+                // Don't log JSON content in production to avoid exposing sensitive data
                 if (!string.IsNullOrEmpty(visibilitiesJson))
                 {
                     try
@@ -87,14 +87,7 @@ public class VaultItemController : ControllerBase
                             Converters = { new JsonStringEnumConverter(namingPolicy: null) }
                         };
                         dto.Visibilities = JsonSerializer.Deserialize<List<ItemVisibilityDTO>>(visibilitiesJson, options);
-                        _logger.LogInformation("Deserialized {Count} visibility entries for vault {VaultId}", dto.Visibilities?.Count ?? 0, vaultId);
-                        if (dto.Visibilities != null)
-                        {
-                            foreach (var v in dto.Visibilities)
-                            {
-                                _logger.LogInformation("Visibility: VaultMemberId={VaultMemberId}, Permission={Permission}", v.VaultMemberId, v.Permission);
-                            }
-                        }
+                        // Don't log detailed visibility information in production
                     }
                     catch (Exception ex)
                     {
@@ -141,7 +134,7 @@ public class VaultItemController : ControllerBase
             if (Request.Form.ContainsKey("visibilities"))
             {
                 var visibilitiesJson = Request.Form["visibilities"].ToString();
-                _logger.LogInformation("Received visibilities JSON for update item {ItemId} in vault {VaultId}: {Json}", itemId, vaultId, visibilitiesJson);
+                // Don't log JSON content in production to avoid exposing sensitive data
                 if (!string.IsNullOrEmpty(visibilitiesJson))
                 {
                     try
@@ -153,14 +146,7 @@ public class VaultItemController : ControllerBase
                             Converters = { new JsonStringEnumConverter(namingPolicy: null) }
                         };
                         dto.Visibilities = JsonSerializer.Deserialize<List<ItemVisibilityDTO>>(visibilitiesJson, options);
-                        _logger.LogInformation("Deserialized {Count} visibility entries for update item {ItemId}", dto.Visibilities?.Count ?? 0, itemId);
-                        if (dto.Visibilities != null)
-                        {
-                            foreach (var v in dto.Visibilities)
-                            {
-                                _logger.LogInformation("Visibility: VaultMemberId={VaultMemberId}, Permission={Permission}", v.VaultMemberId, v.Permission);
-                            }
-                        }
+                        // Don't log detailed visibility information in production
                     }
                     catch (Exception ex)
                     {

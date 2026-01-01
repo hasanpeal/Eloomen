@@ -544,8 +544,7 @@ public class VaultItemService : IVaultItemService
             };
             _dbContext.VaultItemVisibilities.Add(itemVisibility);
             recordsAdded++;
-            _logger.LogInformation("Added visibility record: ItemId={ItemId}, MemberId={MemberId}, Permission={Permission}", 
-                itemId, member.Id, permission);
+            // Don't log individual visibility records in production
         }
 
         var saved = await _dbContext.SaveChangesAsync();

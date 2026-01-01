@@ -38,16 +38,11 @@ public class CloudflareR2Service : ICloudflareR2Service
             endpoint, _bucketName
         );
 
-        _logger.LogInformation(
-            "Access Key ID: {Preview} | Length: {Length}",
-            accessKeyId.Length > 8 ? accessKeyId[..8] + "..." : "***", accessKeyId.Length
-        );
+        // Don't log access key details in production
 
         // Extract Account ID from endpoint (for diagnostics only)
         var match = Regex.Match(endpoint, @"https://([a-f0-9]+)\.r2\.cloudflarestorage\.com");
         _accountId = match.Success ? match.Groups[1].Value : "unknown";
-
-        _logger.LogInformation("Detected R2 Account ID: {AccountId}", _accountId);
 
         // Initialize MinIO client for Cloudflare R2
         var endpointUri = new Uri(endpoint);
@@ -67,9 +62,6 @@ public class CloudflareR2Service : ICloudflareR2Service
     {
         try
         {
-            _logger.LogInformation("Starting upload to R2: {ObjectKey}, Size: {Size} bytes, ContentType: {ContentType}",
-                objectKey, file.Length, file.ContentType);
-
             // Ensure bucket exists
             var bucketExists = await _minioClient.BucketExistsAsync(
                 new BucketExistsArgs().WithBucket(_bucketName), 
@@ -77,7 +69,6 @@ public class CloudflareR2Service : ICloudflareR2Service
             
             if (!bucketExists)
             {
-                _logger.LogWarning("Bucket {BucketName} does not exist, creating it...", _bucketName);
                 await _minioClient.MakeBucketAsync(
                     new MakeBucketArgs().WithBucket(_bucketName), 
                     cancellationToken);
@@ -94,12 +85,10 @@ public class CloudflareR2Service : ICloudflareR2Service
                     .WithContentType(file.ContentType),
                 cancellationToken);
 
-            _logger.LogInformation("Successfully uploaded object {Key} to R2", objectKey);
             return objectKey;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error uploading file to R2: {ObjectKey}", objectKey);
             throw;
         }
     }
@@ -115,12 +104,10 @@ public class CloudflareR2Service : ICloudflareR2Service
                     .WithBucket(_bucketName)
                     .WithObject(objectKey),
                 cancellationToken);
-            _logger.LogInformation("Successfully deleted object {Key} from R2", objectKey);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting file from R2: {ObjectKey}", objectKey);
             return false;
         }
     }
@@ -141,7 +128,6 @@ public class CloudflareR2Service : ICloudflareR2Service
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error generating presigned URL for R2: {ObjectKey}", objectKey);
             throw;
         }
     }
@@ -167,7 +153,6 @@ public class CloudflareR2Service : ICloudflareR2Service
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting file stream from R2: {ObjectKey}", objectKey);
             throw;
         }
     }
@@ -176,22 +161,17 @@ public class CloudflareR2Service : ICloudflareR2Service
     {
         try
         {
-            _logger.LogInformation(
-                "Testing R2 connection by checking bucket {Bucket}",
-                _bucketName
-            );
-
             var exists = await _minioClient.BucketExistsAsync(
                 new BucketExistsArgs().WithBucket(_bucketName),
                 cancellationToken);
 
             if (exists)
             {
-                _logger.LogInformation("R2 connection test successful - bucket {Bucket} exists", _bucketName);
+                _logger.LogInformation("R2 connection test successful - bucket exists");
             }
             else
             {
-                _logger.LogWarning("Bucket {Bucket} does not exist, but connection is working", _bucketName);
+                _logger.LogWarning("Bucket does not exist, but connection is working");
             }
 
             return true;
@@ -199,28 +179,8 @@ public class CloudflareR2Service : ICloudflareR2Service
         catch (Exception ex)
         {
             _logger.LogError(
-                ex,
-                "R2 connection test failed | Message: {Message}",
-                ex.Message
+                "R2 connection test failed"
             );
-
-            if (ex.Message.Contains("InvalidAccessKeyId") || ex.Message.Contains("Access Denied") || ex.Message.Contains("403"))
-            {
-                _logger.LogError("═══════════════════════════════════════════════════════════");
-                _logger.LogError("R2 AUTHENTICATION ERROR");
-                _logger.LogError("═══════════════════════════════════════════════════════════");
-                _logger.LogError("The Access Key ID does not exist in Cloudflare R2 records.");
-                _logger.LogError("");
-                _logger.LogError("TROUBLESHOOTING STEPS:");
-                _logger.LogError("1. Verify your endpoint Account ID: {AccountId}", _accountId);
-                _logger.LogError("2. Go to Cloudflare Dashboard → R2 → Manage R2 API Tokens");
-                _logger.LogError("3. Check which Account ID your API token was created for");
-                _logger.LogError("4. If different, create a NEW API token for Account ID: {AccountId}", _accountId);
-                _logger.LogError("5. Update appsettings.Development.json with the new credentials");
-                _logger.LogError("6. Ensure the token has 'Object Read & Write' permissions");
-                _logger.LogError("═══════════════════════════════════════════════════════════");
-            }
-
             return false;
         }
     }
