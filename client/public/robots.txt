@@ -1,16 +1,22 @@
 User-agent: *
+# Allow indexing of public pages
 Allow: /
+Allow: /about
+Allow: /login
+Allow: /signup
+
+# Disallow private/authentication pages
 Disallow: /api/
 Disallow: /dashboard
 Disallow: /account
 Disallow: /vaults/
-Disallow: /login
-Disallow: /signup
 Disallow: /forgot-password
 Disallow: /reset-password
 Disallow: /verify-email
 Disallow: /verify-device
 Disallow: /accept-invite
+Disallow: /privacy
+Disallow: /terms
 
 # Sitemap
 Sitemap: https://eloomen.com/sitemap.xml
