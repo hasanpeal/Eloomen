@@ -871,12 +871,12 @@ export default function VaultDetailPage() {
                   isOwner && (
                     <button
                       onClick={handleReleaseVaultManually}
-                      className="px-3 sm:px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors cursor-pointer border border-green-500/30 flex items-center gap-2 text-sm sm:text-base"
+                      className="px-3 sm:px-4 py-1 bg-green-500/20 text-green-400 rounded-full hover:bg-green-500/30 transition-colors cursor-pointer border border-green-500/30 flex items-center gap-2 text-sm sm:text-base"
                       title="Manually release vault"
                     >
                       <Unlock className="w-4 h-4" />
-                      <span className="hidden sm:inline">Release Vault</span>
-                      <span className="sm:hidden">Release</span>
+                      <span className="hidden sm:inline text-xs font-bold">Release Vault</span>
+                      <span className="sm:hidden text-xs font-bold">Release</span>
                     </button>
                   )}
               </div>
@@ -1343,6 +1343,7 @@ export default function VaultDetailPage() {
                       message: string;
                       icon: React.ComponentType<{ className?: string }>;
                       color: string;
+                      changedFields?: string[];
                     } => {
                       const userName =
                         log.userName || log.userEmail || "Unknown";
@@ -1376,19 +1377,19 @@ export default function VaultDetailPage() {
                           };
                         case "CreateInvite":
                           return {
-                            message: `${userName} invited ${targetUserName}`,
+                            message: `${userName} invited a new member`,
                             icon: Mail,
                             color: "text-indigo-400",
                           };
                         case "CancelInvite":
                           return {
-                            message: `${userName} cancelled invite for ${targetUserName}`,
+                            message: `${userName} cancelled invite for a new member`,
                             icon: X,
                             color: "text-yellow-400",
                           };
                         case "ResendInvite":
                           return {
-                            message: `${userName} resent invite to ${targetUserName}`,
+                            message: `${userName} resent invite to a new member`,
                             icon: Send,
                             color: "text-blue-400",
                           };
@@ -1465,10 +1466,20 @@ export default function VaultDetailPage() {
                             log.additionalContext?.match(
                               /Title: ([^,]+)/
                             )?.[1] || "an item";
+                          // Extract changed fields from "ChangedFields: Field1, Field2, Field3"
+                          const changedFieldsMatch =
+                            log.additionalContext?.match(/ChangedFields: (.+)/);
+                          const changedFields = changedFieldsMatch
+                            ? changedFieldsMatch[1]
+                                .split(", ")
+                                .map((f) => f.trim())
+                                .filter(Boolean)
+                            : [];
                           return {
                             message: `${userName} updated ${updateTitle}`,
                             icon: Edit,
                             color: "text-blue-400",
+                            changedFields: changedFields,
                           };
                         case "DeleteItem":
                           const deleteTitle =
@@ -1503,6 +1514,7 @@ export default function VaultDetailPage() {
                       message,
                       icon: Icon,
                       color,
+                      changedFields,
                     } = formatLogMessage(log);
 
                     return (
@@ -1518,6 +1530,21 @@ export default function VaultDetailPage() {
                             <p className="text-xs sm:text-sm text-slate-100 font-medium break-words">
                               {message}
                             </p>
+                            {changedFields && changedFields.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                <span className="text-sm text-slate-400">
+                                  Changed:
+                                </span>
+                                {changedFields.map((field, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="text-xs px-2 bg-blue-500/20 text-blue-300 rounded border border-blue-500/30"
+                                  >
+                                    {field}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                             {log.additionalContext &&
                               log.action !== "CreateItem" &&
                               log.action !== "UpdateItem" &&
@@ -2029,7 +2056,15 @@ export default function VaultDetailPage() {
         }}
         vaultId={vaultId}
         members={members.filter((m) => m.status === "Active")}
-        onSuccess={loadVaultData}
+        onSuccess={async () => {
+          await loadVaultData();
+          // Reset logsLoaded so history will refresh when user switches to history tab
+          setLogsLoaded(false);
+          // Refresh logs if history tab is already active
+          if (activeTab === "history") {
+            await loadVaultLogs();
+          }
+        }}
         editingItem={editingItem}
         currentUserEmail={user?.email}
       />

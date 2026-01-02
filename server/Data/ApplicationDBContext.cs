@@ -27,6 +27,7 @@ public class ApplicationDBContext : IdentityDbContext<User>
     public DbSet<VaultCryptoWallet> VaultCryptoWallets { get; set; }
     public DbSet<AccountLog> AccountLogs { get; set; }
     public DbSet<VaultLog> VaultLogs { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -386,6 +387,23 @@ public class ApplicationDBContext : IdentityDbContext<User>
                 .WithMany()
                 .HasForeignKey(e => e.TargetUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Notifications configuration
+        builder.Entity<Notification>(entity =>
+        {
+            entity.ToTable("Notifications");
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.IsRead);
+            entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => e.Type);
+            entity.HasIndex(e => e.VaultId);
+            
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
         });
     }
 

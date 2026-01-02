@@ -9,10 +9,12 @@ import {
   Vault,
   CreateVaultRequest,
   SessionExpiredError,
+  Notification,
 } from "../lib/api";
 import toast from "react-hot-toast";
-import { Plus, Menu, X, Lock, Crown, ShieldCheck, User } from "lucide-react";
+import { Plus, Menu, X, Lock, Crown, ShieldCheck, User, Bell } from "lucide-react";
 import ContactModal from "../components/ContactModal";
+import NotificationsModal from "../components/NotificationsModal";
 
 export default function DashboardPage() {
   const { isLoading, isAuthenticated, user, logout } = useAuth();
@@ -26,6 +28,10 @@ export default function DashboardPage() {
   );
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [createForm, setCreateForm] = useState<CreateVaultRequest>({
     name: "",
     description: "",
@@ -41,7 +47,19 @@ export default function DashboardPage() {
   useEffect(() => {
     if (isAuthenticated) {
       loadVaults();
+      loadNotifications();
     }
+  }, [isAuthenticated]);
+
+  // Poll for new notifications every 30 seconds
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const interval = setInterval(() => {
+      loadNotifications(true); // Only load unread count
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [isAuthenticated]);
 
   const loadVaults = async () => {
@@ -88,6 +106,24 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     await logout();
   };
+
+  const loadNotifications = async (unreadOnly: boolean = false) => {
+    try {
+      setNotificationsLoading(true);
+      const data = await apiClient.getNotifications(unreadOnly);
+      setNotifications(data);
+      const unread = data.filter((n) => !n.isRead).length;
+      setUnreadCount(unread);
+    } catch (error) {
+      if (error instanceof SessionExpiredError) {
+        return;
+      }
+      // Silently fail for notifications - don't show error toast
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
 
   if (isLoading || loading) {
     return (
@@ -245,6 +281,21 @@ export default function DashboardPage() {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-1">
+          <button
+            onClick={() => {
+              setShowNotificationsModal(true);
+              loadNotifications();
+            }}
+            className="relative px-4 py-2 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
+            aria-label="Notifications"
+          >
+            <Bell className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
           <Link
             href="/account"
             className="px-4 py-2 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
@@ -265,18 +316,35 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Mobile Menu Button */}
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="md:hidden p-2 text-slate-300 hover:text-indigo-400 transition-colors"
-          aria-label="Toggle menu"
-        >
-          {isMobileMenuOpen ? (
-            <X className="w-6 h-6" />
-          ) : (
-            <Menu className="w-6 h-6" />
-          )}
-        </button>
+        {/* Mobile Navigation */}
+        <div className="md:hidden flex items-center gap-2">
+          <button
+            onClick={() => {
+              setShowNotificationsModal(true);
+              loadNotifications();
+            }}
+            className="relative p-2 text-slate-300 hover:text-indigo-400 transition-colors cursor-pointer"
+            aria-label="Notifications"
+          >
+            <Bell className="w-6 h-6" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-2 text-slate-300 hover:text-indigo-400 transition-colors cursor-pointer"
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? (
+              <X className="w-6 h-6" />
+            ) : (
+              <Menu className="w-6 h-6" />
+            )}
+          </button>
+        </div>
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
@@ -667,6 +735,15 @@ export default function DashboardPage() {
       <ContactModal
         isOpen={showContactModal}
         onClose={() => setShowContactModal(false)}
+      />
+
+      {/* Notifications Modal */}
+      <NotificationsModal
+        isOpen={showNotificationsModal}
+        onClose={() => setShowNotificationsModal(false)}
+        notifications={notifications}
+        onNotificationsUpdate={loadNotifications}
+        loading={notificationsLoading}
       />
     </div>
   );

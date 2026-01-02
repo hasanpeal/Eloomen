@@ -293,7 +293,7 @@ export default function TermsPage() {
                 <p>
                   <strong className="text-slate-200">Storage:</strong> Your data
                   is stored on secure cloud infrastructure. Documents are stored
-                  on Cloudflare R2, while encrypted metadata is stored in a
+                  on S3 bucket, while encrypted metadata is stored in a
                   PostgreSQL database.
                 </p>
                 <p>

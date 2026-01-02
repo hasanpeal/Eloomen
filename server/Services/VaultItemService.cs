@@ -14,26 +14,32 @@ public class VaultItemService : IVaultItemService
     private readonly UserManager<User> _userManager;
     private readonly IVaultService _vaultService;
     private readonly IEncryptionService _encryptionService;
-    private readonly ICloudflareR2Service _r2Service;
+    private readonly IS3Service _s3Service;
     private readonly IConfiguration _configuration;
     private readonly ILogger<VaultItemService> _logger;
+    private readonly IEmailService _emailService;
+    private readonly INotificationService _notificationService;
 
     public VaultItemService(
         ApplicationDBContext dbContext,
         UserManager<User> userManager,
         IVaultService vaultService,
         IEncryptionService encryptionService,
-        ICloudflareR2Service r2Service,
+        IS3Service s3Service,
         IConfiguration configuration,
-        ILogger<VaultItemService> logger)
+        ILogger<VaultItemService> logger,
+        IEmailService emailService,
+        INotificationService notificationService)
     {
         _dbContext = dbContext;
         _userManager = userManager;
         _vaultService = vaultService;
         _encryptionService = encryptionService;
-        _r2Service = r2Service;
+        _s3Service = s3Service;
         _configuration = configuration;
         _logger = logger;
+        _emailService = emailService;
+        _notificationService = notificationService;
     }
 
     public async Task<VaultItemResponseDTO?> GetItemByIdAsync(int itemId, string userId)
@@ -196,6 +202,7 @@ public class VaultItemService : IVaultItemService
             .Include(i => i.Note)
             .Include(i => i.Link)
             .Include(i => i.CryptoWallet)
+            .Include(i => i.Visibilities)
             .FirstOrDefaultAsync(i => i.Id == itemId);
 
         if (item == null || item.Status == ItemStatus.Deleted)
@@ -213,40 +220,122 @@ public class VaultItemService : IVaultItemService
 
         var encryptionKey = await GetVaultEncryptionKeyAsync(item.VaultId, userId);
 
-        // Update common fields
-        if (!string.IsNullOrEmpty(dto.Title))
+        // Track changes for logging
+        var changedFields = new List<string>();
+
+        // Track common field changes
+        if (!string.IsNullOrEmpty(dto.Title) && dto.Title != item.Title)
+        {
+            changedFields.Add("Title");
             item.Title = dto.Title;
-        if (dto.Description != null)
+        }
+        if (dto.Description != null && dto.Description != item.Description)
+        {
+            changedFields.Add("Description");
             item.Description = dto.Description;
+        }
         item.UpdatedAt = DateTime.UtcNow;
 
-        // Update item-specific data
+        // Track item-specific field changes
         switch (item.ItemType)
         {
             case ItemType.Document:
-                await UpdateDocumentAsync(item, dto, encryptionKey);
+                var docChanges = await UpdateDocumentAsync(item, dto, encryptionKey);
+                changedFields.AddRange(docChanges);
                 break;
             case ItemType.Password:
-                await UpdatePasswordAsync(item, dto, encryptionKey);
+                var passwordChanges = await UpdatePasswordAsync(item, dto, encryptionKey);
+                changedFields.AddRange(passwordChanges);
                 break;
             case ItemType.Note:
-                await UpdateNoteAsync(item, dto, encryptionKey);
+                var noteChanges = await UpdateNoteAsync(item, dto, encryptionKey);
+                changedFields.AddRange(noteChanges);
                 break;
             case ItemType.Link:
-                await UpdateLinkAsync(item, dto, encryptionKey);
+                var linkChanges = await UpdateLinkAsync(item, dto, encryptionKey);
+                changedFields.AddRange(linkChanges);
                 break;
             case ItemType.CryptoWallet:
-                await UpdateCryptoWalletAsync(item, dto, encryptionKey);
+                var walletChanges = await UpdateCryptoWalletAsync(item, dto, encryptionKey);
+                changedFields.AddRange(walletChanges);
                 break;
         }
 
-        // Update visibility if provided - user must have Edit permission to update permissions
+        // Track visibility changes - only log if permissions actually changed
         if (dto.Visibilities != null && dto.Visibilities.Any())
         {
+            // Get vault to identify owner
+            var vault = await _dbContext.Vaults
+                .AsNoTracking()
+                .FirstOrDefaultAsync(v => v.Id == item.VaultId);
+            
+            // Get all vault members to identify owners
+            var vaultMembers = await _dbContext.VaultMembers
+                .Where(m => m.VaultId == item.VaultId && m.Status == MemberStatus.Active)
+                .ToListAsync();
+            
+            var ownerMemberIds = vaultMembers
+                .Where(m => m.UserId == vault?.OwnerId)
+                .Select(m => m.Id)
+                .ToHashSet();
+            
+            // Get current visibilities as a dictionary for comparison (exclude owners)
+            var currentVisibilities = item.Visibilities
+                .Where(v => !ownerMemberIds.Contains(v.VaultMemberId))
+                .ToDictionary(v => v.VaultMemberId, v => v.Permission);
+            
+            // Get new visibilities as a dictionary (frontend doesn't send owners)
+            var newVisibilities = dto.Visibilities
+                .GroupBy(v => v.VaultMemberId)
+                .ToDictionary(g => g.Key, g => g.Last().Permission);
+            
+            // Check if permissions actually changed
+            bool permissionsChanged = false;
+            
+            // Check if any existing permission changed or was removed
+            foreach (var current in currentVisibilities)
+            {
+                if (!newVisibilities.ContainsKey(current.Key))
+                {
+                    permissionsChanged = true;
+                    break;
+                }
+                if (newVisibilities[current.Key] != current.Value)
+                {
+                    permissionsChanged = true;
+                    break;
+                }
+            }
+            
+            // Check if any new permissions were added
+            if (!permissionsChanged)
+            {
+                foreach (var newVis in newVisibilities.Keys)
+                {
+                    if (!currentVisibilities.ContainsKey(newVis))
+                    {
+                        permissionsChanged = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (permissionsChanged)
+            {
+                changedFields.Add("Permissions");
+            }
+            
             await UpdateItemVisibilitiesAsync(itemId, dto.Visibilities, item.VaultId, userId);
         }
 
         await _dbContext.SaveChangesAsync();
+
+        // Build log context with changed fields
+        var logContext = $"Title: {item.Title}";
+        if (changedFields.Any())
+        {
+            logContext += $", ChangedFields: {string.Join(", ", changedFields)}";
+        }
 
         // Log vault activity
         var vaultLog = new VaultLog
@@ -256,10 +345,53 @@ public class VaultItemService : IVaultItemService
             Action = "UpdateItem",
             Timestamp = DateTime.UtcNow,
             ItemId = itemId,
-            AdditionalContext = $"Title: {item.Title}"
+            AdditionalContext = logContext
         };
         _dbContext.VaultLogs.Add(vaultLog);
         await _dbContext.SaveChangesAsync();
+
+        // Send notification to item owner if edited by someone else
+        if (item.CreatedByUserId != userId)
+        {
+            try
+            {
+                var vault = await _dbContext.Vaults
+                    .Include(v => v.Owner)
+                    .FirstOrDefaultAsync(v => v.Id == item.VaultId);
+                var editor = await _userManager.FindByIdAsync(userId);
+                var editorName = editor?.UserName ?? editor?.Email ?? "Unknown";
+                
+                if (vault != null && item.CreatedByUserId != null)
+                {
+                    var itemOwner = await _userManager.FindByIdAsync(item.CreatedByUserId);
+                    if (itemOwner != null && !string.IsNullOrEmpty(itemOwner.Email))
+                    {
+                        await _emailService.SendVaultItemChangedNotificationAsync(
+                            itemOwner.Email,
+                            itemOwner.UserName ?? itemOwner.Email,
+                            vault.Name,
+                            item.Title,
+                            "edited",
+                            editorName
+                        );
+                        
+                        // Save notification
+                        await _notificationService.CreateNotificationAsync(
+                            itemOwner.Id,
+                            "Item Edited",
+                            $"{editorName} edited the item \"{item.Title}\" in vault \"{vault.Name}\"",
+                            "ItemEdited",
+                            vaultId: vault.Id,
+                            itemId: item.Id
+                        );
+                    }
+                }
+            }
+            catch
+            {
+                // Log but don't fail the update
+            }
+        }
 
         return await GetItemByIdAsync(itemId, userId);
     }
@@ -287,10 +419,10 @@ public class VaultItemService : IVaultItemService
         item.DeletedAt = DateTime.UtcNow;
         item.DeletedBy = userId;
 
-        // Optionally delete document from R2
+        // Optionally delete document from S3
         if (item.Document != null && item.ItemType == ItemType.Document)
         {
-            await _r2Service.DeleteFileAsync(item.Document.ObjectKey);
+            await _s3Service.DeleteFileAsync(item.Document.ObjectKey);
         }
 
         await _dbContext.SaveChangesAsync();
@@ -307,6 +439,49 @@ public class VaultItemService : IVaultItemService
         };
         _dbContext.VaultLogs.Add(vaultLog);
         await _dbContext.SaveChangesAsync();
+
+        // Send notification to item owner if deleted by someone else
+        if (item.CreatedByUserId != userId)
+        {
+            try
+            {
+                var vault = await _dbContext.Vaults
+                    .Include(v => v.Owner)
+                    .FirstOrDefaultAsync(v => v.Id == item.VaultId);
+                var deleter = await _userManager.FindByIdAsync(userId);
+                var deleterName = deleter?.UserName ?? deleter?.Email ?? "Unknown";
+                
+                if (vault != null && item.CreatedByUserId != null)
+                {
+                    var itemOwner = await _userManager.FindByIdAsync(item.CreatedByUserId);
+                    if (itemOwner != null && !string.IsNullOrEmpty(itemOwner.Email))
+                    {
+                        await _emailService.SendVaultItemChangedNotificationAsync(
+                            itemOwner.Email,
+                            itemOwner.UserName ?? itemOwner.Email,
+                            vault.Name,
+                            item.Title,
+                            "deleted",
+                            deleterName
+                        );
+                        
+                        // Save notification
+                        await _notificationService.CreateNotificationAsync(
+                            itemOwner.Id,
+                            "Item Deleted",
+                            $"{deleterName} deleted the item \"{item.Title}\" in vault \"{vault.Name}\"",
+                            "ItemDeleted",
+                            vaultId: vault.Id,
+                            itemId: itemId
+                        );
+                    }
+                }
+            }
+            catch
+            {
+                // Log but don't fail the delete
+            }
+        }
 
         return true;
     }
@@ -405,7 +580,7 @@ public class VaultItemService : IVaultItemService
         var documentId = Guid.NewGuid().ToString();
         var objectKey = $"vaults/{item.VaultId}/documents/{documentId}/{file.FileName}";
 
-        await _r2Service.UploadFileAsync(file, objectKey);
+        await _s3Service.UploadFileAsync(file, objectKey);
 
         var document = new VaultDocument
         {
@@ -584,11 +759,14 @@ public class VaultItemService : IVaultItemService
         await _dbContext.SaveChangesAsync();
     }
 
-    private async Task UpdateDocumentAsync(VaultItem item, UpdateVaultItemDTO dto, string encryptionKey)
+    private async Task<List<string>> UpdateDocumentAsync(VaultItem item, UpdateVaultItemDTO dto, string encryptionKey)
     {
+        var changes = new List<string>();
+
         if (dto.DeleteDocument == true && item.Document != null)
         {
-            await _r2Service.DeleteFileAsync(item.Document.ObjectKey);
+            changes.Add("Document (deleted)");
+            await _s3Service.DeleteFileAsync(item.Document.ObjectKey);
             _dbContext.VaultDocuments.Remove(item.Document);
         }
 
@@ -596,38 +774,64 @@ public class VaultItemService : IVaultItemService
         {
             if (item.Document != null)
             {
-                await _r2Service.DeleteFileAsync(item.Document.ObjectKey);
+                changes.Add("Document (replaced)");
+                await _s3Service.DeleteFileAsync(item.Document.ObjectKey);
                 _dbContext.VaultDocuments.Remove(item.Document);
+            }
+            else
+            {
+                changes.Add("Document (added)");
             }
 
             await CreateDocumentAsync(item, dto.DocumentFile, encryptionKey);
         }
 
-        await Task.CompletedTask;
+        return changes;
     }
 
-    private async Task UpdatePasswordAsync(VaultItem item, UpdateVaultItemDTO dto, string encryptionKey)
+    private async Task<List<string>> UpdatePasswordAsync(VaultItem item, UpdateVaultItemDTO dto, string encryptionKey)
     {
+        var changes = new List<string>();
+
         if (item.Password == null)
         {
             item.Password = new VaultPassword { VaultItemId = item.Id };
             _dbContext.VaultPasswords.Add(item.Password);
         }
 
-        if (dto.Username != null)
+        if (dto.Username != null && dto.Username != item.Password.Username)
+        {
+            changes.Add("Username");
             item.Password.Username = dto.Username;
+        }
         if (dto.Password != null)
+        {
+            changes.Add("Password");
             item.Password.EncryptedPassword = _encryptionService.Encrypt(dto.Password, encryptionKey);
-        if (dto.WebsiteUrl != null)
+        }
+        if (dto.WebsiteUrl != null && dto.WebsiteUrl != item.Password.WebsiteUrl)
+        {
+            changes.Add("Website URL");
             item.Password.WebsiteUrl = dto.WebsiteUrl;
+        }
         if (dto.PasswordNotes != null)
-            item.Password.Notes = !string.IsNullOrEmpty(dto.PasswordNotes) ? _encryptionService.Encrypt(dto.PasswordNotes, encryptionKey) : null;
+        {
+            var newNotes = !string.IsNullOrEmpty(dto.PasswordNotes) ? _encryptionService.Encrypt(dto.PasswordNotes, encryptionKey) : null;
+            var oldNotes = item.Password.Notes;
+            if (newNotes != oldNotes)
+            {
+                changes.Add("Notes");
+                item.Password.Notes = newNotes;
+            }
+        }
 
-        await Task.CompletedTask;
+        return changes;
     }
 
-    private async Task UpdateNoteAsync(VaultItem item, UpdateVaultItemDTO dto, string encryptionKey)
+    private async Task<List<string>> UpdateNoteAsync(VaultItem item, UpdateVaultItemDTO dto, string encryptionKey)
     {
+        var changes = new List<string>();
+
         if (item.Note == null)
         {
             item.Note = new VaultNote { VaultItemId = item.Id };
@@ -635,51 +839,100 @@ public class VaultItemService : IVaultItemService
         }
 
         if (dto.NoteContent != null)
-            item.Note.EncryptedContent = _encryptionService.Encrypt(dto.NoteContent, encryptionKey);
-        if (dto.ContentFormat.HasValue)
+        {
+            var newContent = _encryptionService.Encrypt(dto.NoteContent, encryptionKey);
+            var oldContent = item.Note.EncryptedContent;
+            if (newContent != oldContent)
+            {
+                changes.Add("Content");
+                item.Note.EncryptedContent = newContent;
+            }
+        }
+        if (dto.ContentFormat.HasValue && dto.ContentFormat.Value != item.Note.ContentFormat)
+        {
+            changes.Add("Content Format");
             item.Note.ContentFormat = dto.ContentFormat.Value;
+        }
 
-        await Task.CompletedTask;
+        return changes;
     }
 
-    private async Task UpdateLinkAsync(VaultItem item, UpdateVaultItemDTO dto, string encryptionKey)
+    private async Task<List<string>> UpdateLinkAsync(VaultItem item, UpdateVaultItemDTO dto, string encryptionKey)
     {
+        var changes = new List<string>();
+
         if (item.Link == null)
         {
             item.Link = new VaultLink { VaultItemId = item.Id };
             _dbContext.VaultLinks.Add(item.Link);
         }
 
-        if (dto.Url != null)
+        if (dto.Url != null && dto.Url != item.Link.Url)
+        {
+            changes.Add("URL");
             item.Link.Url = dto.Url;
+        }
         if (dto.LinkNotes != null)
-            item.Link.Notes = !string.IsNullOrEmpty(dto.LinkNotes) ? _encryptionService.Encrypt(dto.LinkNotes, encryptionKey) : null;
+        {
+            var newNotes = !string.IsNullOrEmpty(dto.LinkNotes) ? _encryptionService.Encrypt(dto.LinkNotes, encryptionKey) : null;
+            var oldNotes = item.Link.Notes;
+            if (newNotes != oldNotes)
+            {
+                changes.Add("Notes");
+                item.Link.Notes = newNotes;
+            }
+        }
 
-        await Task.CompletedTask;
+        return changes;
     }
 
-    private async Task UpdateCryptoWalletAsync(VaultItem item, UpdateVaultItemDTO dto, string encryptionKey)
+    private async Task<List<string>> UpdateCryptoWalletAsync(VaultItem item, UpdateVaultItemDTO dto, string encryptionKey)
     {
+        var changes = new List<string>();
+
         if (item.CryptoWallet == null)
         {
             item.CryptoWallet = new VaultCryptoWallet { VaultItemId = item.Id };
             _dbContext.VaultCryptoWallets.Add(item.CryptoWallet);
         }
 
-        if (dto.WalletType.HasValue)
+        if (dto.WalletType.HasValue && dto.WalletType.Value != item.CryptoWallet.WalletType)
+        {
+            changes.Add("Wallet Type");
             item.CryptoWallet.WalletType = dto.WalletType.Value;
-        if (dto.PlatformName != null)
+        }
+        if (dto.PlatformName != null && dto.PlatformName != item.CryptoWallet.PlatformName)
+        {
+            changes.Add("Platform Name");
             item.CryptoWallet.PlatformName = dto.PlatformName;
-        if (dto.Blockchain != null)
+        }
+        if (dto.Blockchain != null && dto.Blockchain != item.CryptoWallet.Blockchain)
+        {
+            changes.Add("Blockchain");
             item.CryptoWallet.Blockchain = dto.Blockchain;
-        if (dto.PublicAddress != null)
+        }
+        if (dto.PublicAddress != null && dto.PublicAddress != item.CryptoWallet.PublicAddress)
+        {
+            changes.Add("Public Address");
             item.CryptoWallet.PublicAddress = dto.PublicAddress;
+        }
         if (dto.Secret != null)
+        {
+            changes.Add("Secret");
             item.CryptoWallet.EncryptedSecret = _encryptionService.Encrypt(dto.Secret, encryptionKey);
+        }
         if (dto.CryptoNotes != null)
-            item.CryptoWallet.Notes = !string.IsNullOrEmpty(dto.CryptoNotes) ? _encryptionService.Encrypt(dto.CryptoNotes, encryptionKey) : null;
+        {
+            var newNotes = !string.IsNullOrEmpty(dto.CryptoNotes) ? _encryptionService.Encrypt(dto.CryptoNotes, encryptionKey) : null;
+            var oldNotes = item.CryptoWallet.Notes;
+            if (newNotes != oldNotes)
+            {
+                changes.Add("Notes");
+                item.CryptoWallet.Notes = newNotes;
+            }
+        }
 
-        await Task.CompletedTask;
+        return changes;
     }
 
     private async Task UpdateItemVisibilitiesAsync(int itemId, List<ItemVisibilityDTO> visibilities, int vaultId, string userId)
@@ -741,7 +994,7 @@ public class VaultItemService : IVaultItemService
         // Map item-specific data
         if (item.Document != null)
         {
-            var downloadUrl = await _r2Service.GetPresignedUrlAsync(item.Document.ObjectKey, 60);
+            var downloadUrl = await _s3Service.GetPresignedUrlAsync(item.Document.ObjectKey, 60);
             dto.Document = new VaultDocumentDTO
             {
                 ObjectKey = item.Document.ObjectKey,

@@ -1,6 +1,6 @@
 namespace server.Interfaces;
 
-public interface ICloudflareR2Service
+public interface IS3Service
 {
     Task<string> UploadFileAsync(IFormFile file, string objectKey, CancellationToken cancellationToken = default);
     Task<bool> DeleteFileAsync(string objectKey, CancellationToken cancellationToken = default);

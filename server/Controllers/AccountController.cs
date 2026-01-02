@@ -24,6 +24,7 @@ public class AccountController : ControllerBase
     private readonly IConfiguration _config;
     private readonly ApplicationDBContext _dbContext;
     private readonly IVaultService _vaultService;
+    private readonly INotificationService _notificationService;
     
     public AccountController(
         UserManager<User> userManager, 
@@ -33,7 +34,8 @@ public class AccountController : ControllerBase
         IEmailService emailService,
         IConfiguration config, 
         ApplicationDBContext dbContext,
-        IVaultService vaultService)
+        IVaultService vaultService,
+        INotificationService notificationService)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -43,6 +45,7 @@ public class AccountController : ControllerBase
         _config = config;
         _dbContext = dbContext;
         _vaultService = vaultService;
+        _notificationService = notificationService;
     }
 
     [HttpPost("register")]
@@ -754,6 +757,22 @@ public class AccountController : ControllerBase
             _dbContext.AccountLogs.Add(accountLog);
             await _dbContext.SaveChangesAsync();
 
+            // Send email confirmation and save notification
+            try
+            {
+                await _emailService.SendPasswordChangedConfirmationAsync(user.Email!, user.UserName!);
+                await _notificationService.CreateNotificationAsync(
+                    user.Id,
+                    "Password Changed",
+                    "Your password has been successfully changed.",
+                    "PasswordChanged"
+                );
+            }
+            catch
+            {
+                // Log but don't fail the password change
+            }
+
             return Ok(new { Message = "Password changed successfully" });
         }
 
@@ -1115,7 +1134,18 @@ public class AccountController : ControllerBase
         // Save all changes before deleting user
         await _dbContext.SaveChangesAsync();
 
-        // Step 6: Delete user account
+        // Step 6: Send email confirmation before deleting user
+        try
+        {
+            await _emailService.SendAccountDeletedConfirmationAsync(user.Email!, user.UserName!);
+            // Note: Don't save notification for account deletion since account will be deleted
+        }
+        catch
+        {
+            // Log but don't fail the deletion
+        }
+
+        // Step 7: Delete user account
         var result = await _userManager.DeleteAsync(user);
         if (!result.Succeeded)
         {

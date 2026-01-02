@@ -15,12 +15,12 @@ namespace server.Controllers
     public class HealthController : ControllerBase
     {
         private readonly ApplicationDBContext _db;
-        private readonly ICloudflareR2Service? _r2Service;
+        private readonly IS3Service? _s3Service;
 
-        public HealthController(ApplicationDBContext db, ICloudflareR2Service? r2Service = null)
+        public HealthController(ApplicationDBContext db, IS3Service? s3Service = null)
         {
             _db = db;
-            _r2Service = r2Service;
+            _s3Service = s3Service;
         }
 
         [HttpGet]
@@ -39,22 +39,22 @@ namespace server.Controllers
                 result["database"] = new { type = "postgres", connected = false, error = ex.Message };
             }
 
-            // Test R2 connection
-            if (_r2Service != null)
+            // Test S3 connection
+            if (_s3Service != null)
             {
                 try
                 {
-                    var r2Connected = await _r2Service.TestConnectionAsync();
-                    result["r2"] = new { type = "cloudflare-r2", connected = r2Connected };
+                    var s3Connected = await _s3Service.TestConnectionAsync();
+                    result["s3"] = new { type = "s3-bucket", connected = s3Connected };
                 }
                 catch (Exception ex)
                 {
-                    result["r2"] = new { type = "cloudflare-r2", connected = false, error = ex.Message };
+                    result["s3"] = new { type = "s3-bucket", connected = false, error = ex.Message };
                 }
             }
             else
             {
-                result["r2"] = new { type = "cloudflare-r2", connected = false, error = "R2 service not configured" };
+                result["s3"] = new { type = "s3-bucket", connected = false, error = "S3 service not configured" };
             }
 
             return Ok(result);

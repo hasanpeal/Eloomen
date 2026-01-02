@@ -16,7 +16,8 @@ public class VaultService : IVaultService
     private readonly IEmailService _emailService;
     private readonly IConfiguration _config;
     private readonly ILogger<VaultService> _logger;
-    private readonly ICloudflareR2Service _r2Service;
+    private readonly IS3Service _s3Service;
+    private readonly INotificationService _notificationService;
 
     public VaultService(
         ApplicationDBContext dbContext,
@@ -24,14 +25,16 @@ public class VaultService : IVaultService
         IEmailService emailService,
         IConfiguration config,
         ILogger<VaultService> logger,
-        ICloudflareR2Service r2Service)
+        IS3Service s3Service,
+        INotificationService notificationService)
     {
         _dbContext = dbContext;
         _userManager = userManager;
         _emailService = emailService;
         _config = config;
         _logger = logger;
-        _r2Service = r2Service;
+        _s3Service = s3Service;
+        _notificationService = notificationService;
     }
 
     public async Task<VaultResponseDTO?> GetVaultByIdAsync(int vaultId, string userId)
@@ -238,6 +241,10 @@ public class VaultService : IVaultService
         vault.Name = dto.Name;
         vault.Description = dto.Description;
 
+        // Track if policy changed
+        var oldPolicyType = vault.Policy?.PolicyType;
+        var policyChanged = false;
+
         // Validate and update policy
         ValidatePolicyConfiguration(dto.PolicyType, dto.ReleaseDate, null, dto.ExpiresAt);
 
@@ -259,10 +266,15 @@ public class VaultService : IVaultService
             };
             SetPolicyReleaseStatus(vault.Policy);
             _dbContext.VaultPolicies.Add(vault.Policy);
+            policyChanged = true;
         }
         else
         {
             // Update existing policy
+            if (vault.Policy.PolicyType != dto.PolicyType)
+            {
+                policyChanged = true;
+            }
             vault.Policy.PolicyType = dto.PolicyType;
             // Set time to 9 AM UTC for date-only inputs
             vault.Policy.ReleaseDate = dto.ReleaseDate.HasValue 
@@ -271,7 +283,46 @@ public class VaultService : IVaultService
             vault.Policy.ExpiresAt = dto.ExpiresAt.HasValue 
                 ? dto.ExpiresAt.Value.Date.AddHours(9) 
                 : null;
+            var oldReleaseStatus = vault.Policy.ReleaseStatus;
             SetPolicyReleaseStatus(vault.Policy);
+            
+            // Check if release status changed from non-released to released
+            if (oldReleaseStatus != ReleaseStatus.Released && vault.Policy.ReleaseStatus == ReleaseStatus.Released)
+            {
+                // Send notification to all vault members
+                try
+                {
+                    var members = await _dbContext.VaultMembers
+                        .Include(m => m.User)
+                        .Where(m => m.VaultId == vaultId && m.Status == MemberStatus.Active)
+                        .ToListAsync();
+                    
+                    foreach (var member in members)
+                    {
+                        if (member.User != null && !string.IsNullOrEmpty(member.User.Email))
+                        {
+                            await _emailService.SendVaultReleasedNotificationAsync(
+                                member.User.Email,
+                                member.User.UserName ?? member.User.Email,
+                                vault.Name
+                            );
+                            
+                            // Save notification (trigger also creates one, but this ensures it's created)
+                            await _notificationService.CreateNotificationAsync(
+                                member.User.Id,
+                                "Vault Released",
+                                $"The vault \"{vault.Name}\" has been released and is now accessible.",
+                                "VaultReleased",
+                                vaultId: vaultId
+                            );
+                        }
+                    }
+                }
+                catch
+                {
+                    // Log but don't fail the update
+                }
+            }
         }
 
         await _dbContext.SaveChangesAsync();
@@ -289,6 +340,37 @@ public class VaultService : IVaultService
         };
         _dbContext.VaultLogs.Add(vaultLog);
         await _dbContext.SaveChangesAsync();
+
+        // Send notification to owner if policy changed (owner is the one making the change, but send for record)
+        if (policyChanged)
+        {
+            try
+            {
+                var owner = await _userManager.FindByIdAsync(vault.OwnerId);
+                if (owner != null && !string.IsNullOrEmpty(owner.Email))
+                {
+                    await _emailService.SendVaultPolicyChangedNotificationAsync(
+                        owner.Email,
+                        owner.UserName ?? owner.Email,
+                        vault.Name,
+                        dto.PolicyType.ToString()
+                    );
+                    
+                    // Save notification
+                    await _notificationService.CreateNotificationAsync(
+                        owner.Id,
+                        "Vault Policy Changed",
+                        $"The policy for vault \"{vault.Name}\" has been changed to {dto.PolicyType}.",
+                        "VaultPolicyChanged",
+                        vaultId: vaultId
+                    );
+                }
+            }
+            catch
+            {
+                // Log but don't fail the update
+            }
+        }
 
         return new VaultResponseDTO
         {
@@ -319,7 +401,7 @@ public class VaultService : IVaultService
         if (vault.OwnerId != userId)
             return false;
 
-        // Delete all documents from Cloudflare R2 before deleting items
+        // Delete all documents from S3 bucket before deleting items
         var itemsWithDocuments = vault.Items
             .Where(i => i.Document != null && i.ItemType == ItemType.Document)
             .ToList();
@@ -330,15 +412,15 @@ public class VaultService : IVaultService
             {
                 try
                 {
-                    await _r2Service.DeleteFileAsync(item.Document.ObjectKey);
-                    _logger.LogInformation("Deleted document {ObjectKey} from R2 for vault {VaultId}", 
+                    await _s3Service.DeleteFileAsync(item.Document.ObjectKey);
+                    _logger.LogInformation("Deleted document {ObjectKey} from S3 for vault {VaultId}", 
                         item.Document.ObjectKey, vaultId);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to delete document {ObjectKey} from R2 for vault {VaultId}. Continuing with vault deletion.", 
+                    _logger.LogWarning(ex, "Failed to delete document {ObjectKey} from S3 for vault {VaultId}. Continuing with vault deletion.", 
                         item.Document.ObjectKey, vaultId);
-                    // Continue with deletion even if R2 deletion fails
+                    // Continue with deletion even if S3 deletion fails
                 }
             }
         }
@@ -353,6 +435,33 @@ public class VaultService : IVaultService
         };
         _dbContext.VaultLogs.Add(vaultLog);
         await _dbContext.SaveChangesAsync();
+
+        // Send notification to owner before deletion
+        try
+        {
+            var owner = await _userManager.FindByIdAsync(vault.OwnerId);
+            if (owner != null && !string.IsNullOrEmpty(owner.Email))
+            {
+                await _emailService.SendVaultDeletedNotificationAsync(
+                    owner.Email,
+                    owner.UserName ?? owner.Email,
+                    vault.Name
+                );
+                
+                // Save notification (before deletion)
+                await _notificationService.CreateNotificationAsync(
+                    owner.Id,
+                    "Vault Deleted",
+                    $"The vault \"{vault.Name}\" has been deleted. All items and data have been permanently removed.",
+                    "VaultDeleted",
+                    vaultId: vaultId
+                );
+            }
+        }
+        catch
+        {
+            // Log but don't fail the deletion
+        }
 
         // Actually delete the vault (not archive) - cascade delete will handle items, members, invites, policy
         _dbContext.Vaults.Remove(vault);
@@ -478,6 +587,40 @@ public class VaultService : IVaultService
         };
         _dbContext.VaultLogs.Add(vaultLog);
         await _dbContext.SaveChangesAsync();
+
+        // Send notification to vault owner if inviter is not the owner
+        if (vault.OwnerId != inviterId)
+        {
+            try
+            {
+                var owner = await _userManager.FindByIdAsync(vault.OwnerId);
+                var inviterName = inviter?.UserName ?? inviter?.Email ?? "Unknown";
+                if (owner != null && !string.IsNullOrEmpty(owner.Email))
+                {
+                    await _emailService.SendInviteSentToOwnerNotificationAsync(
+                        owner.Email,
+                        owner.UserName ?? owner.Email,
+                        vault.Name,
+                        inviterName,
+                        dto.InviteeEmail
+                    );
+                    
+                    // Save notification
+                    await _notificationService.CreateNotificationAsync(
+                        owner.Id,
+                        "New Invite Sent",
+                        $"{inviterName} sent an invitation to {dto.InviteeEmail} for vault \"{vault.Name}\".",
+                        "InviteSent",
+                        vaultId: vaultId,
+                        inviteId: invite.Id
+                    );
+                }
+            }
+            catch
+            {
+                // Log but don't fail the invite creation
+            }
+        }
         
         return new VaultInviteResponseDTO
         {
@@ -640,8 +783,46 @@ public class VaultService : IVaultService
         // Check if expired
         if (invite.ExpiresAt.HasValue && invite.ExpiresAt.Value < DateTime.UtcNow)
         {
-            invite.Status = InviteStatus.Expired;
-            await _dbContext.SaveChangesAsync();
+            if (invite.Status != InviteStatus.Expired)
+            {
+                invite.Status = InviteStatus.Expired;
+                await _dbContext.SaveChangesAsync();
+                
+                // Send notifications to invitee and inviter
+                try
+                {
+                    var vault = await _dbContext.Vaults
+                        .FirstOrDefaultAsync(v => v.Id == invite.VaultId);
+                    
+                    // Notify invitee
+                    if (!string.IsNullOrEmpty(invite.InviteeEmail))
+                    {
+                        await _emailService.SendInviteExpiredNotificationAsync(
+                            invite.InviteeEmail,
+                            invite.InviteeEmail,
+                            vault?.Name ?? "Unknown Vault",
+                            false
+                        );
+                    }
+                    
+                    // Notify inviter
+                    var inviter = await _userManager.FindByIdAsync(invite.InviterId);
+                    if (inviter != null && !string.IsNullOrEmpty(inviter.Email))
+                    {
+                        await _emailService.SendInviteExpiredNotificationAsync(
+                            inviter.Email,
+                            inviter.UserName ?? inviter.Email,
+                            vault?.Name ?? "Unknown Vault",
+                            true
+                        );
+                    }
+                }
+                catch
+                {
+                    // Log but don't fail
+                }
+            }
+            
             return new InviteInfoDTO
             {
                 IsValid = false,
@@ -679,8 +860,70 @@ public class VaultService : IVaultService
         // Check if expired
         if (invite.ExpiresAt.HasValue && invite.ExpiresAt.Value < DateTime.UtcNow)
         {
-            invite.Status = InviteStatus.Expired;
-            await _dbContext.SaveChangesAsync();
+            if (invite.Status != InviteStatus.Expired)
+            {
+                invite.Status = InviteStatus.Expired;
+                await _dbContext.SaveChangesAsync();
+                
+                // Send notifications to invitee and inviter
+                try
+                {
+                    var vault = await _dbContext.Vaults
+                        .FirstOrDefaultAsync(v => v.Id == invite.VaultId);
+                    
+                    // Notify invitee
+                    if (!string.IsNullOrEmpty(invite.InviteeEmail))
+                    {
+                        var inviteeUser = await _userManager.FindByEmailAsync(invite.InviteeEmail);
+                        if (inviteeUser != null)
+                        {
+                            await _emailService.SendInviteExpiredNotificationAsync(
+                                invite.InviteeEmail,
+                                invite.InviteeEmail,
+                                vault?.Name ?? "Unknown Vault",
+                                false
+                            );
+                            
+                            // Save notification
+                            await _notificationService.CreateNotificationAsync(
+                                inviteeUser.Id,
+                                "Invitation Expired",
+                                $"Your invitation to join vault \"{vault?.Name ?? "Unknown Vault"}\" has expired.",
+                                "InviteExpired",
+                                vaultId: invite.VaultId,
+                                inviteId: invite.Id
+                            );
+                        }
+                    }
+                    
+                    // Notify inviter
+                    var inviter = await _userManager.FindByIdAsync(invite.InviterId);
+                    if (inviter != null && !string.IsNullOrEmpty(inviter.Email))
+                    {
+                        await _emailService.SendInviteExpiredNotificationAsync(
+                            inviter.Email,
+                            inviter.UserName ?? inviter.Email,
+                            vault?.Name ?? "Unknown Vault",
+                            true
+                        );
+                        
+                        // Save notification
+                        await _notificationService.CreateNotificationAsync(
+                            inviter.Id,
+                            "Invitation Expired",
+                            $"The invitation you sent for vault \"{vault?.Name ?? "Unknown Vault"}\" has expired.",
+                            "InviteExpired",
+                            vaultId: invite.VaultId,
+                            inviteId: invite.Id
+                        );
+                    }
+                }
+                catch
+                {
+                    // Log but don't fail
+                }
+            }
+            
             return false;
         }
 
@@ -793,6 +1036,39 @@ public class VaultService : IVaultService
             };
             _dbContext.VaultLogs.Add(vaultLog);
             await _dbContext.SaveChangesAsync();
+
+            // Send notification to vault owner
+            try
+            {
+                var vault = await _dbContext.Vaults
+                    .Include(v => v.Owner)
+                    .FirstOrDefaultAsync(v => v.Id == invite.VaultId);
+                var memberName = user?.UserName ?? user?.Email ?? "Unknown";
+                
+                if (vault != null && vault.Owner != null && !string.IsNullOrEmpty(vault.Owner.Email))
+                {
+                    await _emailService.SendInviteAcceptedToOwnerNotificationAsync(
+                        vault.Owner.Email,
+                        vault.Owner.UserName ?? vault.Owner.Email,
+                        vault.Name,
+                        memberName
+                    );
+                    
+                    // Save notification
+                    await _notificationService.CreateNotificationAsync(
+                        vault.Owner.Id,
+                        "New Member Joined",
+                        $"{memberName} has accepted the invitation and joined vault \"{vault.Name}\".",
+                        "InviteAccepted",
+                        vaultId: invite.VaultId,
+                        inviteId: invite.Id
+                    );
+                }
+            }
+            catch
+            {
+                // Log but don't fail the invite acceptance
+            }
 
             // Step: Create VaultItemVisibility records for all existing items in the vault
             // New members should get View permission for all existing items
@@ -1159,9 +1435,54 @@ public class VaultService : IVaultService
         {
             if (DateTime.UtcNow >= policy.ReleaseDate.Value)
             {
+                var wasReleased = policy.ReleaseStatus == ReleaseStatus.Released;
                 policy.ReleaseStatus = ReleaseStatus.Released;
                 policy.ReleasedAt = DateTime.UtcNow;
                 await _dbContext.SaveChangesAsync();
+                
+                // Send notification to all vault members if status just changed to released
+                if (!wasReleased)
+                {
+                    try
+                    {
+                        var vault = await _dbContext.Vaults
+                            .FirstOrDefaultAsync(v => v.Id == policy.VaultId);
+                        
+                        if (vault != null)
+                        {
+                            var members = await _dbContext.VaultMembers
+                                .Include(m => m.User)
+                                .Where(m => m.VaultId == policy.VaultId && m.Status == MemberStatus.Active)
+                                .ToListAsync();
+                            
+                            foreach (var member in members)
+                            {
+                                if (member.User != null && !string.IsNullOrEmpty(member.User.Email))
+                                {
+                                    await _emailService.SendVaultReleasedNotificationAsync(
+                                        member.User.Email,
+                                        member.User.UserName ?? member.User.Email,
+                                        vault.Name
+                                    );
+                                    
+                                    // Save notification (trigger also creates one, but this ensures it's created)
+                                    await _notificationService.CreateNotificationAsync(
+                                        member.User.Id,
+                                        "Vault Released",
+                                        $"The vault \"{vault.Name}\" has been released and is now accessible.",
+                                        "VaultReleased",
+                                        vaultId: policy.VaultId
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Log but don't fail
+                    }
+                }
+                
                 return true;
             }
             return false;
@@ -1334,6 +1655,40 @@ public class VaultService : IVaultService
         };
         _dbContext.VaultLogs.Add(vaultLog);
         await _dbContext.SaveChangesAsync();
+
+        // Send notification to all vault members
+        try
+        {
+            var members = await _dbContext.VaultMembers
+                .Include(m => m.User)
+                .Where(m => m.VaultId == vaultId && m.Status == MemberStatus.Active)
+                .ToListAsync();
+            
+            foreach (var member in members)
+            {
+                if (member.User != null && !string.IsNullOrEmpty(member.User.Email))
+                {
+                    await _emailService.SendVaultReleasedNotificationAsync(
+                        member.User.Email,
+                        member.User.UserName ?? member.User.Email,
+                        vault.Name
+                    );
+                    
+                    // Save notification (trigger also creates one, but this ensures it's created)
+                    await _notificationService.CreateNotificationAsync(
+                        member.User.Id,
+                        "Vault Released",
+                        $"The vault \"{vault.Name}\" has been released and is now accessible.",
+                        "VaultReleased",
+                        vaultId: vaultId
+                    );
+                }
+            }
+        }
+        catch
+        {
+            // Log but don't fail the release
+        }
 
         return true;
     }

@@ -6,44 +6,49 @@ using System.Text.RegularExpressions;
 
 namespace server.Services;
 
-public class CloudflareR2Service : ICloudflareR2Service
+public class S3Service : IS3Service
 {
     private readonly IMinioClient _minioClient;
     private readonly string _bucketName;
     private readonly string _accountId;
-    private readonly ILogger<CloudflareR2Service> _logger;
+    private readonly ILogger<S3Service> _logger;
 
-    public CloudflareR2Service(IConfiguration configuration, ILogger<CloudflareR2Service> logger)
+    public S3Service(IConfiguration configuration, ILogger<S3Service> logger)
     {
         _logger = logger;
 
-        _bucketName = configuration["CloudflareR2:BucketName"]
-            ?? throw new InvalidOperationException("CloudflareR2:BucketName is not configured");
+        _bucketName = configuration["S3:BucketName"]
+            ?? throw new InvalidOperationException("S3:BucketName is not configured");
 
-        var endpoint = configuration["CloudflareR2:Endpoint"]
-            ?? throw new InvalidOperationException("CloudflareR2:Endpoint is not configured");
+        var endpoint = configuration["S3:Endpoint"]
+            ?? throw new InvalidOperationException("S3:Endpoint is not configured");
 
-        var accessKeyId = configuration["CloudflareR2:AccessKeyId"]
-            ?? throw new InvalidOperationException("CloudflareR2:AccessKeyId is not configured");
+        var accessKeyId = configuration["S3:AccessKeyId"]
+            ?? throw new InvalidOperationException("S3:AccessKeyId is not configured");
 
-        var secretAccessKey = configuration["CloudflareR2:SecretAccessKey"]
-            ?? throw new InvalidOperationException("CloudflareR2:SecretAccessKey is not configured");
+        var secretAccessKey = configuration["S3:SecretAccessKey"]
+            ?? throw new InvalidOperationException("S3:SecretAccessKey is not configured");
 
         endpoint = endpoint.Trim().TrimEnd('/');
         accessKeyId = accessKeyId.Trim();
         secretAccessKey = secretAccessKey.Trim();
 
         _logger.LogInformation(
-            "Initializing Cloudflare R2 service with MinIO"
+            "Initializing S3 service with MinIO"
         );
 
         // Don't log access key details in production
 
-        // Extract Account ID from endpoint (for diagnostics only)
+        // Extract Account ID from endpoint (for diagnostics only) - supports both S3 and R2 endpoints
         var match = Regex.Match(endpoint, @"https://([a-f0-9]+)\.r2\.cloudflarestorage\.com");
+        if (!match.Success)
+        {
+            // Try S3 endpoint pattern
+            match = Regex.Match(endpoint, @"https?://([^.]+)\.s3\.[^.]+\.amazonaws\.com");
+        }
         _accountId = match.Success ? match.Groups[1].Value : "unknown";
 
-        // Initialize MinIO client for Cloudflare R2
+        // Initialize MinIO client for S3-compatible storage
         var endpointUri = new Uri(endpoint);
         _minioClient = new MinioClient()
             .WithEndpoint(endpointUri.Host, endpointUri.Port == 443 ? 443 : (endpointUri.Port == -1 ? 443 : endpointUri.Port))
@@ -51,7 +56,7 @@ public class CloudflareR2Service : ICloudflareR2Service
             .WithSSL(endpointUri.Scheme == "https")
             .Build();
 
-        _logger.LogInformation("Cloudflare R2 MinIO client initialized successfully");
+        _logger.LogInformation("S3 MinIO client initialized successfully");
     }
 
     public async Task<string> UploadFileAsync(
@@ -166,7 +171,7 @@ public class CloudflareR2Service : ICloudflareR2Service
 
             if (exists)
             {
-                _logger.LogInformation("R2 connection test successful - bucket exists");
+                _logger.LogInformation("S3 connection test successful - bucket exists");
             }
             else
             {
@@ -178,9 +183,10 @@ public class CloudflareR2Service : ICloudflareR2Service
         catch (Exception ex)
         {
             _logger.LogError(
-                "R2 connection test failed"
+                "S3 connection test failed"
             );
             return false;
         }
     }
 }
+

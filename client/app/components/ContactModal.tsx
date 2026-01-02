@@ -4,18 +4,25 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { apiClient } from "../lib/api";
 import toast from "react-hot-toast";
+import { useAuth } from "../contexts/AuthContext";
 
 interface ContactModalProps {
   isOpen: boolean;
   onClose: () => void;
+  isPublic?: boolean; // If true, use public contact endpoint (no auth required)
 }
 
-export default function ContactModal({ isOpen, onClose }: ContactModalProps) {
+export default function ContactModal({ isOpen, onClose, isPublic = false }: ContactModalProps) {
+  const { isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
+    email: "",
     message: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Determine if we should use public endpoint
+  const usePublicEndpoint = isPublic || !isAuthenticated;
 
   if (!isOpen) return null;
 
@@ -32,16 +39,37 @@ export default function ContactModal({ isOpen, onClose }: ContactModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name.trim() || !formData.message.trim()) {
-      toast.error("Please fill in all fields");
-      return;
+    if (usePublicEndpoint) {
+      if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
+        toast.error("Please fill in all fields");
+        return;
+      }
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email.trim())) {
+        toast.error("Please enter a valid email address");
+        return;
+      }
+    } else {
+      if (!formData.name.trim() || !formData.message.trim()) {
+        toast.error("Please fill in all fields");
+        return;
+      }
     }
 
     setIsLoading(true);
     try {
-      await apiClient.sendContact(formData.name.trim(), formData.message.trim());
+      if (usePublicEndpoint) {
+        await apiClient.sendPublicContact(
+          formData.name.trim(),
+          formData.email.trim(),
+          formData.message.trim()
+        );
+      } else {
+        await apiClient.sendContact(formData.name.trim(), formData.message.trim());
+      }
       toast.success("Message sent successfully!");
-      setFormData({ name: "", message: "" });
+      setFormData({ name: "", email: "", message: "" });
       onClose();
     } catch (error) {
       const errorMessage =
@@ -91,6 +119,29 @@ export default function ContactModal({ isOpen, onClose }: ContactModalProps) {
               placeholder="Your name"
             />
           </div>
+
+          {usePublicEndpoint && (
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-sm font-semibold text-slate-300 mb-2"
+              >
+                Email
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                maxLength={256}
+                autoComplete="email"
+                className="w-full px-4 py-3 bg-slate-900/80 backdrop-blur-sm border border-slate-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-slate-100 font-medium placeholder:text-slate-500"
+                placeholder="your.email@example.com"
+              />
+            </div>
+          )}
 
           <div>
             <label

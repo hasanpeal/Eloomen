@@ -498,6 +498,53 @@ class ApiClient {
     });
   }
 
+  async sendPublicContact(name: string, email: string, message: string): Promise<{ message: string }> {
+    // Public endpoint doesn't require authentication
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+    const response = await fetch(`${API_BASE_URL}/contact/public`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        Name: name,
+        Email: email,
+        Message: message,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: "Failed to send message" }));
+      throw new Error(errorData.message || "Failed to send message");
+    }
+
+    return response.json();
+  }
+
+  async getNotifications(unreadOnly: boolean = false): Promise<Notification[]> {
+    return this.request<Notification[]>(`/notification?unreadOnly=${unreadOnly}`, {
+      method: "GET",
+    });
+  }
+
+  async markNotificationAsRead(id: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/notification/${id}/read`, {
+      method: "POST",
+    });
+  }
+
+  async deleteNotification(id: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/notification/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async deleteAllReadNotifications(): Promise<{ message: string }> {
+    return this.request<{ message: string }>("/notification/read", {
+      method: "DELETE",
+    });
+  }
+
   isAuthenticated(): boolean {
     return !!this.getAccessToken();
   }
@@ -1180,6 +1227,19 @@ export interface AccountLog {
   action: string;
   timestamp: string;
   additionalContext?: string;
+}
+
+export interface Notification {
+  id: number;
+  title: string;
+  description: string;
+  type: string;
+  isRead: boolean;
+  createdAt: string;
+  readAt?: string;
+  vaultId?: number;
+  itemId?: number;
+  inviteId?: number;
 }
 
 export const apiClient = new ApiClient();
