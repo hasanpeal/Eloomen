@@ -1343,6 +1343,7 @@ export default function VaultDetailPage() {
                       message: string;
                       icon: React.ComponentType<{ className?: string }>;
                       color: string;
+                      changedFields?: string[];
                     } => {
                       const userName =
                         log.userName || log.userEmail || "Unknown";
@@ -1465,10 +1466,20 @@ export default function VaultDetailPage() {
                             log.additionalContext?.match(
                               /Title: ([^,]+)/
                             )?.[1] || "an item";
+                          // Extract changed fields from "ChangedFields: Field1, Field2, Field3"
+                          const changedFieldsMatch =
+                            log.additionalContext?.match(/ChangedFields: (.+)/);
+                          const changedFields = changedFieldsMatch
+                            ? changedFieldsMatch[1]
+                                .split(", ")
+                                .map((f) => f.trim())
+                                .filter(Boolean)
+                            : [];
                           return {
                             message: `${userName} updated ${updateTitle}`,
                             icon: Edit,
                             color: "text-blue-400",
+                            changedFields: changedFields,
                           };
                         case "DeleteItem":
                           const deleteTitle =
@@ -1503,6 +1514,7 @@ export default function VaultDetailPage() {
                       message,
                       icon: Icon,
                       color,
+                      changedFields,
                     } = formatLogMessage(log);
 
                     return (
@@ -1518,6 +1530,21 @@ export default function VaultDetailPage() {
                             <p className="text-xs sm:text-sm text-slate-100 font-medium break-words">
                               {message}
                             </p>
+                            {changedFields && changedFields.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                <span className="text-sm text-slate-400">
+                                  Changed:
+                                </span>
+                                {changedFields.map((field, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="text-xs px-2 bg-blue-500/20 text-blue-300 rounded border border-blue-500/30"
+                                  >
+                                    {field}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                             {log.additionalContext &&
                               log.action !== "CreateItem" &&
                               log.action !== "UpdateItem" &&
@@ -2029,7 +2056,15 @@ export default function VaultDetailPage() {
         }}
         vaultId={vaultId}
         members={members.filter((m) => m.status === "Active")}
-        onSuccess={loadVaultData}
+        onSuccess={async () => {
+          await loadVaultData();
+          // Reset logsLoaded so history will refresh when user switches to history tab
+          setLogsLoaded(false);
+          // Refresh logs if history tab is already active
+          if (activeTab === "history") {
+            await loadVaultLogs();
+          }
+        }}
         editingItem={editingItem}
         currentUserEmail={user?.email}
       />

@@ -283,7 +283,7 @@ export default function CreateVaultItemModal({
             <select
               value={itemType}
               onChange={(e) => setItemType(e.target.value as ItemType)}
-              className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer disabled:cursor-not-allowed"
               disabled={!!editingItem}
             >
               <option value="Password">Password</option>
@@ -450,7 +450,7 @@ export default function CreateVaultItemModal({
                 <select
                   value={walletType}
                   onChange={(e) => setWalletType(e.target.value as any)}
-                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer"
                 >
                   <option value="SeedPhrase">Seed Phrase</option>
                   <option value="PrivateKey">Private Key</option>
@@ -569,7 +569,7 @@ export default function CreateVaultItemModal({
                           newVisibilities.set(member.id, value);
                           setVisibilities(newVisibilities);
                         }}
-                        className="ml-4 bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        className="ml-4 bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer"
                       >
                         <option value="View">View</option>
                         <option value="Edit">Edit</option>
@@ -590,14 +590,14 @@ export default function CreateVaultItemModal({
             <button
               type="button"
               onClick={handleClose}
-              className="px-6 py-2 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors"
+              className="px-6 py-2 bg-slate-700 text-slate-200 font-semibold rounded-lg hover:bg-slate-600 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {loading ? "Saving" : editingItem ? "Update" : "Create"}
             </button>
