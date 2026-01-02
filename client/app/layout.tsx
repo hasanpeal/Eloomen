@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
     default:
-      "Eloomen - Secure Digital Vault Platform | Control Your Digital Life",
+      "Eloomen",
     template: "%s | Eloomen",
   },
   description: siteDescription,

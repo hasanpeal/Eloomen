@@ -58,7 +58,11 @@ export default function Home() {
       </div>
 
       {/* Navigation */}
-      <nav className="relative container mx-auto px-6 py-6 flex items-center justify-between z-10" role="navigation" aria-label="Main navigation">
+      <nav
+        className="relative container mx-auto px-6 py-6 flex items-center justify-between z-10"
+        role="navigation"
+        aria-label="Main navigation"
+      >
         <Link href="/" className="group" aria-label="Eloomen Home">
           <span className="text-xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:via-purple-300 group-hover:to-pink-300 transition-all duration-300">
             Eloomen
@@ -86,7 +90,7 @@ export default function Home() {
         {/* Mobile Menu Button */}
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="md:hidden p-2 text-slate-300 hover:text-indigo-400 transition-colors"
+          className="md:hidden p-2 text-slate-300 hover:text-indigo-400 transition-colors cursor-pointer"
           aria-label="Toggle menu"
           aria-expanded={isMobileMenuOpen}
         >
@@ -167,7 +171,7 @@ export default function Home() {
             groups immediately, conditionally, or at a future time.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-20">
+          <div className="flex flex-row gap-4 justify-center mb-20">
             <Link
               href="/signup"
               className="px-8 py-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-xl font-semibold text-lg hover:shadow-2xl transition-all shadow-xl hover:shadow-indigo-500/50 transform hover:-translate-y-1 cursor-pointer"
@@ -185,7 +189,10 @@ export default function Home() {
           </div>
 
           {/* Features Grid */}
-          <section className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mt-20" aria-label="Key Features">
+          <section
+            className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mt-20"
+            aria-label="Key Features"
+          >
             <article className="group bg-slate-800/60 backdrop-blur-md rounded-2xl p-6 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-2xl hover:-translate-y-1">
               <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
                 <svg
@@ -293,33 +300,33 @@ export default function Home() {
 
           {/* Use Cases Section */}
           <section className="mt-24 mb-16" aria-label="Use Cases">
-            <h2 className="text-2xl md:text-5xl font-bold mb-12 text-slate-100">
+            <h2 className="text-2xl md:text-4xl font-bold mb-12 text-slate-100">
               Built for Real-World Scenarios
             </h2>
             <div className="grid md:grid-cols-3 gap-6">
               <article className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-xl">
-                <h3 className="font-bold text-xl mb-3 text-slate-100">
+                <h2 className="font-bold text-xl mb-3 text-slate-100">
                   For Families
-                </h3>
-                <p className="text-slate-400 leading-relaxed">
+                </h2>
+                <p className="text-slate-400 leading-relaxed text-sm">
                   Parents can securely share important documents and information
-                  with children, accessible at the right time.
+                  with children.
                 </p>
               </article>
               <article className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-xl">
-                <h3 className="font-bold text-xl mb-3 text-slate-100">
+                <h2 className="font-bold text-xl mb-3 text-slate-100">
                   For Partners
-                </h3>
-                <p className="text-slate-400 leading-relaxed">
+                </h2>
+                <p className="text-slate-400 leading-relaxed text-sm">
                   Spouses can share subscriptions, estate information, and
                   personal data with conditional access.
                 </p>
               </article>
               <article className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-8 border border-slate-700/50 hover:border-indigo-600 transition-all shadow-lg hover:shadow-xl">
-                <h3 className="font-bold text-xl mb-3 text-slate-100">
+                <h2 className="font-bold text-xl mb-3 text-slate-100">
                   For Professionals
-                </h3>
-                <p className="text-slate-400 leading-relaxed">
+                </h2>
+                <p className="text-slate-400 leading-relaxed text-sm">
                   Patients, lawyers, and caregivers can securely access critical
                   information when needed.
                 </p>
@@ -330,7 +337,10 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="relative border-t border-slate-800/50 mt-20 backdrop-blur-sm bg-slate-900/30" role="contentinfo">
+      <footer
+        className="relative border-t border-slate-800/50 mt-20 backdrop-blur-sm bg-slate-900/30"
+        role="contentinfo"
+      >
         <div className="container mx-auto px-6 py-8">
           <div className="flex flex-row justify-center">
             <p className="text-slate-400 text-sm">

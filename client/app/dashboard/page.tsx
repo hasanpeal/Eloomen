@@ -268,7 +268,7 @@ export default function DashboardPage() {
         {/* Mobile Menu Button */}
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="md:hidden p-2 text-slate-300 hover:text-indigo-400 transition-colors"
+          className="md:hidden p-2 text-slate-300 hover:text-indigo-400 transition-colors cursor-pointer"
           aria-label="Toggle menu"
         >
           {isMobileMenuOpen ? (
