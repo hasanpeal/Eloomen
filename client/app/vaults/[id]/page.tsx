@@ -1376,19 +1376,19 @@ export default function VaultDetailPage() {
                           };
                         case "CreateInvite":
                           return {
-                            message: `${userName} invited ${targetUserName}`,
+                            message: `${userName} invited a new member`,
                             icon: Mail,
                             color: "text-indigo-400",
                           };
                         case "CancelInvite":
                           return {
-                            message: `${userName} cancelled invite for ${targetUserName}`,
+                            message: `${userName} cancelled invite for a new member`,
                             icon: X,
                             color: "text-yellow-400",
                           };
                         case "ResendInvite":
                           return {
-                            message: `${userName} resent invite to ${targetUserName}`,
+                            message: `${userName} resent invite to a new member`,
                             icon: Send,
                             color: "text-blue-400",
                           };
