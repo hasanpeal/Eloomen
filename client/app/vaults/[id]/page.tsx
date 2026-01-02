@@ -871,12 +871,12 @@ export default function VaultDetailPage() {
                   isOwner && (
                     <button
                       onClick={handleReleaseVaultManually}
-                      className="px-3 sm:px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors cursor-pointer border border-green-500/30 flex items-center gap-2 text-sm sm:text-base"
+                      className="px-3 sm:px-4 py-1 bg-green-500/20 text-green-400 rounded-full hover:bg-green-500/30 transition-colors cursor-pointer border border-green-500/30 flex items-center gap-2 text-sm sm:text-base"
                       title="Manually release vault"
                     >
                       <Unlock className="w-4 h-4" />
-                      <span className="hidden sm:inline">Release Vault</span>
-                      <span className="sm:hidden">Release</span>
+                      <span className="hidden sm:inline text-xs font-bold">Release Vault</span>
+                      <span className="sm:hidden text-xs font-bold">Release</span>
                     </button>
                   )}
               </div>

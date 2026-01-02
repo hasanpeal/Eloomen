@@ -228,6 +228,7 @@ builder.Services.AddScoped<IVaultService, VaultService>();
 builder.Services.AddScoped<IEncryptionService, EncryptionService>();
 builder.Services.AddScoped<IS3Service, S3Service>();
 builder.Services.AddScoped<IVaultItemService, VaultItemService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 var app = builder.Build();
 

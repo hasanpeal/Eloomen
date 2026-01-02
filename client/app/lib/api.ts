@@ -498,6 +498,30 @@ class ApiClient {
     });
   }
 
+  async getNotifications(unreadOnly: boolean = false): Promise<Notification[]> {
+    return this.request<Notification[]>(`/notification?unreadOnly=${unreadOnly}`, {
+      method: "GET",
+    });
+  }
+
+  async markNotificationAsRead(id: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/notification/${id}/read`, {
+      method: "POST",
+    });
+  }
+
+  async deleteNotification(id: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/notification/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async deleteAllReadNotifications(): Promise<{ message: string }> {
+    return this.request<{ message: string }>("/notification/read", {
+      method: "DELETE",
+    });
+  }
+
   isAuthenticated(): boolean {
     return !!this.getAccessToken();
   }
@@ -1180,6 +1204,19 @@ export interface AccountLog {
   action: string;
   timestamp: string;
   additionalContext?: string;
+}
+
+export interface Notification {
+  id: number;
+  title: string;
+  description: string;
+  type: string;
+  isRead: boolean;
+  createdAt: string;
+  readAt?: string;
+  vaultId?: number;
+  itemId?: number;
+  inviteId?: number;
 }
 
 export const apiClient = new ApiClient();

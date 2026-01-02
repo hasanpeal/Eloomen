@@ -17,6 +17,8 @@ public class VaultItemService : IVaultItemService
     private readonly IS3Service _s3Service;
     private readonly IConfiguration _configuration;
     private readonly ILogger<VaultItemService> _logger;
+    private readonly IEmailService _emailService;
+    private readonly INotificationService _notificationService;
 
     public VaultItemService(
         ApplicationDBContext dbContext,
@@ -25,7 +27,9 @@ public class VaultItemService : IVaultItemService
         IEncryptionService encryptionService,
         IS3Service s3Service,
         IConfiguration configuration,
-        ILogger<VaultItemService> logger)
+        ILogger<VaultItemService> logger,
+        IEmailService emailService,
+        INotificationService notificationService)
     {
         _dbContext = dbContext;
         _userManager = userManager;
@@ -34,6 +38,8 @@ public class VaultItemService : IVaultItemService
         _s3Service = s3Service;
         _configuration = configuration;
         _logger = logger;
+        _emailService = emailService;
+        _notificationService = notificationService;
     }
 
     public async Task<VaultItemResponseDTO?> GetItemByIdAsync(int itemId, string userId)
@@ -344,6 +350,49 @@ public class VaultItemService : IVaultItemService
         _dbContext.VaultLogs.Add(vaultLog);
         await _dbContext.SaveChangesAsync();
 
+        // Send notification to item owner if edited by someone else
+        if (item.CreatedByUserId != userId)
+        {
+            try
+            {
+                var vault = await _dbContext.Vaults
+                    .Include(v => v.Owner)
+                    .FirstOrDefaultAsync(v => v.Id == item.VaultId);
+                var editor = await _userManager.FindByIdAsync(userId);
+                var editorName = editor?.UserName ?? editor?.Email ?? "Unknown";
+                
+                if (vault != null && item.CreatedByUserId != null)
+                {
+                    var itemOwner = await _userManager.FindByIdAsync(item.CreatedByUserId);
+                    if (itemOwner != null && !string.IsNullOrEmpty(itemOwner.Email))
+                    {
+                        await _emailService.SendVaultItemChangedNotificationAsync(
+                            itemOwner.Email,
+                            itemOwner.UserName ?? itemOwner.Email,
+                            vault.Name,
+                            item.Title,
+                            "edited",
+                            editorName
+                        );
+                        
+                        // Save notification
+                        await _notificationService.CreateNotificationAsync(
+                            itemOwner.Id,
+                            "Item Edited",
+                            $"{editorName} edited the item \"{item.Title}\" in vault \"{vault.Name}\"",
+                            "ItemEdited",
+                            vaultId: vault.Id,
+                            itemId: item.Id
+                        );
+                    }
+                }
+            }
+            catch
+            {
+                // Log but don't fail the update
+            }
+        }
+
         return await GetItemByIdAsync(itemId, userId);
     }
 
@@ -390,6 +439,49 @@ public class VaultItemService : IVaultItemService
         };
         _dbContext.VaultLogs.Add(vaultLog);
         await _dbContext.SaveChangesAsync();
+
+        // Send notification to item owner if deleted by someone else
+        if (item.CreatedByUserId != userId)
+        {
+            try
+            {
+                var vault = await _dbContext.Vaults
+                    .Include(v => v.Owner)
+                    .FirstOrDefaultAsync(v => v.Id == item.VaultId);
+                var deleter = await _userManager.FindByIdAsync(userId);
+                var deleterName = deleter?.UserName ?? deleter?.Email ?? "Unknown";
+                
+                if (vault != null && item.CreatedByUserId != null)
+                {
+                    var itemOwner = await _userManager.FindByIdAsync(item.CreatedByUserId);
+                    if (itemOwner != null && !string.IsNullOrEmpty(itemOwner.Email))
+                    {
+                        await _emailService.SendVaultItemChangedNotificationAsync(
+                            itemOwner.Email,
+                            itemOwner.UserName ?? itemOwner.Email,
+                            vault.Name,
+                            item.Title,
+                            "deleted",
+                            deleterName
+                        );
+                        
+                        // Save notification
+                        await _notificationService.CreateNotificationAsync(
+                            itemOwner.Id,
+                            "Item Deleted",
+                            $"{deleterName} deleted the item \"{item.Title}\" in vault \"{vault.Name}\"",
+                            "ItemDeleted",
+                            vaultId: vault.Id,
+                            itemId: itemId
+                        );
+                    }
+                }
+            }
+            catch
+            {
+                // Log but don't fail the delete
+            }
+        }
 
         return true;
     }
