@@ -9,7 +9,6 @@ namespace server.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class ContactController : ControllerBase
 {
     private readonly UserManager<User> _userManager;
@@ -22,6 +21,7 @@ public class ContactController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<ActionResult> SendContact([FromBody] ContactRequestDTO dto)
     {
         if (!ModelState.IsValid)
@@ -48,6 +48,31 @@ public class ContactController : ControllerBase
                 user.Email ?? "Unknown",
                 user.Id,
                 dto.Name,
+                dto.Message
+            );
+
+            return Ok(new { message = "Contact message sent successfully" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Failed to send contact message. Please try again later." });
+        }
+    }
+
+    [HttpPost("public")]
+    [AllowAnonymous]
+    public async Task<ActionResult> SendPublicContact([FromBody] PublicContactRequestDTO dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            await _emailService.SendPublicContactEmailAsync(
+                dto.Name,
+                dto.Email,
                 dto.Message
             );
 

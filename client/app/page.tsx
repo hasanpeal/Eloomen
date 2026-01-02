@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "./contexts/AuthContext";
+import ContactModal from "./components/ContactModal";
 
 // SEO: This is a client component, but metadata is handled in layout.tsx
 // The content below is optimized for search engines with semantic HTML
@@ -12,6 +13,7 @@ export default function Home() {
   const { isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
 
   // Redirect to dashboard if already authenticated
   useEffect(() => {
@@ -72,19 +74,19 @@ export default function Home() {
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-4">
           <Link
-            href="/login"
+            href="/about"
             className="px-5 py-2.5 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-800/50 backdrop-blur-sm cursor-pointer"
-            aria-label="Sign in to your account"
+            aria-label="Learn about Eloomen"
           >
-            Sign In
+            About Us
           </Link>
-          <Link
-            href="/signup"
+          <button
+            onClick={() => setShowContactModal(true)}
             className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:shadow-xl transition-all shadow-lg hover:shadow-indigo-500/50 transform hover:-translate-y-0.5 cursor-pointer"
-            aria-label="Create a new account"
+            aria-label="Contact us"
           >
-            Get Started
-          </Link>
+            Contact
+          </button>
         </div>
 
         {/* Mobile Menu Button */}
@@ -130,21 +132,23 @@ export default function Home() {
           <div className="absolute top-full left-0 right-0 mt-2 mx-6 bg-slate-800/95 backdrop-blur-md rounded-xl border border-slate-700/50 shadow-2xl md:hidden z-50">
             <div className="flex flex-col p-4 space-y-2">
               <Link
-                href="/login"
+                href="/about"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="px-5 py-3 text-slate-300 hover:text-indigo-400 font-medium transition-colors rounded-lg hover:bg-slate-700/50 cursor-pointer text-center"
-                aria-label="Sign in to your account"
+                aria-label="Learn about Eloomen"
               >
-                Sign In
+                About Us
               </Link>
-              <Link
-                href="/signup"
-                onClick={() => setIsMobileMenuOpen(false)}
+              <button
+                onClick={() => {
+                  setShowContactModal(true);
+                  setIsMobileMenuOpen(false);
+                }}
                 className="px-6 py-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:shadow-xl transition-all shadow-lg hover:shadow-indigo-500/50 cursor-pointer text-center"
-                aria-label="Create a new account"
+                aria-label="Contact us"
               >
-                Get Started
-              </Link>
+                Contact
+              </button>
             </div>
           </div>
         )}
@@ -349,6 +353,13 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      {/* Contact Modal */}
+      <ContactModal
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        isPublic={true}
+      />
     </div>
   );
 }
