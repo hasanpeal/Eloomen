@@ -1,16 +1,14 @@
 # Eloomen
-
 <div align="center">
+<img src="./client/public/icon.png" alt="Eloomen Logo" width="120" height="120" />
 
-![Eloomen Logo](./client/public/icon.png)
-
-**A Secure, Policy-Driven Digital Vault Platform**
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.1-black?logo=next.js)](https://nextjs.org/)
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-336791?logo=postgresql)](https://www.postgresql.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript)](https://www.typescriptlang.org/)
 
+**A Secure, Policy-Driven Digital Vault Platform**
 **Secure your digital life. Share it on your terms.**
 
 </div>
@@ -69,7 +67,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              CLIENT LAYER                                   │
-│  ┌──────────────┐  ┌─────────────┐  ┌──────────────┐  ┌──────────────┐      │ 
+│  ┌──────────────┐  ┌─────────────┐  ┌──────────────┐  ┌──────────────┐      │
 │  │   Pages      │  │ Components  │  │  Contexts    │  │  API Client  │      │
 │  │  (Next.js)   │  │  (React)    │  │  (Auth)      │  │  (HTTP)      │      │
 │  └──────┬───────┘  └──────┬──────┘  └──────┬──────-┘  └──────┬───────┘      │
