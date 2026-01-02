@@ -41,7 +41,12 @@ export default function PrivacyPage() {
               Privacy Policy
             </h1>
             <p className="text-slate-400 text-sm sm:text-base">
-              Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+              Last updated:{" "}
+              {new Date().toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
             </p>
             <p className="mt-2 text-xs text-slate-500 italic">
               Eloomen is a side project committed to protecting your privacy
@@ -58,15 +63,17 @@ export default function PrivacyPage() {
               </h2>
               <div className="text-slate-300 space-y-3 text-sm sm:text-base leading-relaxed">
                 <p>
-                  At Eloomen, we take your privacy seriously. This Privacy Policy
-                  explains how we collect, use, protect, and share your personal
-                  information when you use our Service.
+                  At Eloomen, we take your privacy seriously. This Privacy
+                  Policy explains how we collect, use, protect, and share your
+                  personal information when you use our Service.
                 </p>
                 <p>
-                  <strong className="text-slate-200">Side Project Notice:</strong>{" "}
+                  <strong className="text-slate-200">
+                    Side Project Notice:
+                  </strong>{" "}
                   Eloomen is a side project built for secure digital vault
-                  management. We are committed to transparency about how we handle
-                  your data.
+                  management. We are committed to transparency about how we
+                  handle your data.
                 </p>
               </div>
             </section>
@@ -84,7 +91,9 @@ export default function PrivacyPage() {
                   </p>
                   <ul className="list-disc list-inside space-y-1 ml-4">
                     <li>Username and email address</li>
-                    <li>Hashed password (we never store plain text passwords)</li>
+                    <li>
+                      Hashed password (we never store plain text passwords)
+                    </li>
                     <li>Account creation and last login timestamps</li>
                   </ul>
                 </div>
@@ -103,7 +112,7 @@ export default function PrivacyPage() {
                       notes, crypto secrets, etc.)
                     </li>
                     <li>Item metadata (titles, types, creation dates)</li>
-                    <li>Document files stored on Cloudflare R2</li>
+                    <li>Document files stored on S3 bucket</li>
                   </ul>
                 </div>
 
@@ -112,8 +121,12 @@ export default function PrivacyPage() {
                     Usage and Activity Data:
                   </p>
                   <ul className="list-disc list-inside space-y-1 ml-4">
-                    <li>Account activity logs (login, password changes, etc.)</li>
-                    <li>Vault activity logs (item creation, member actions, etc.)</li>
+                    <li>
+                      Account activity logs (login, password changes, etc.)
+                    </li>
+                    <li>
+                      Vault activity logs (item creation, member actions, etc.)
+                    </li>
                     <li>Device information for verification purposes</li>
                     <li>IP addresses and request metadata (for security)</li>
                   </ul>
@@ -133,7 +146,9 @@ export default function PrivacyPage() {
                   <li>Authenticate your identity and secure your account</li>
                   <li>Process your requests and transactions</li>
                   <li>Send verification emails and security notifications</li>
-                  <li>Maintain activity logs for security and audit purposes</li>
+                  <li>
+                    Maintain activity logs for security and audit purposes
+                  </li>
                   <li>Enforce vault policies and access controls</li>
                   <li>Respond to your inquiries and support requests</li>
                 </ul>
@@ -163,9 +178,9 @@ export default function PrivacyPage() {
                     <ul className="list-disc list-inside space-y-1 ml-4">
                       <li>
                         <strong>AES-256 Encryption:</strong> All sensitive vault
-                        item data is encrypted using Advanced Encryption Standard
-                        with 256-bit keys, which is the same standard used by
-                        banks and government agencies
+                        item data is encrypted using Advanced Encryption
+                        Standard with 256-bit keys, which is the same standard
+                        used by banks and government agencies
                       </li>
                       <li>
                         <strong>CBC Mode:</strong> Cipher Block Chaining ensures
@@ -190,8 +205,8 @@ export default function PrivacyPage() {
                     </p>
                     <ul className="list-disc list-inside space-y-1 ml-4">
                       <li>
-                        Each vault has a unique encryption key derived from: vault
-                        ID + vault owner ID + secure server signing key
+                        Each vault has a unique encryption key derived from:
+                        vault ID + vault owner ID + secure server signing key
                       </li>
                       <li>
                         Keys are never stored in plain text or transmitted to
@@ -202,9 +217,9 @@ export default function PrivacyPage() {
                         operations
                       </li>
                       <li>
-                        All members of a vault use the same encryption key (derived
-                        from vault owner) to ensure shared items can be decrypted
-                        by authorized users
+                        All members of a vault use the same encryption key
+                        (derived from vault owner) to ensure shared items can be
+                        decrypted by authorized users
                       </li>
                     </ul>
                   </div>
@@ -233,7 +248,8 @@ export default function PrivacyPage() {
                     </ul>
                     <p className="mt-2 text-slate-400 italic">
                       Note: Vault names, item titles, and metadata are stored in
-                      plain text to enable search and organization functionality.
+                      plain text to enable search and organization
+                      functionality.
                     </p>
                   </div>
 
@@ -253,16 +269,17 @@ export default function PrivacyPage() {
                         JSON Web Tokens signed with HMAC-SHA512
                       </li>
                       <li>
-                        <strong>Security Stamps:</strong> Token revocation system
-                        that invalidates all sessions when password is changed
+                        <strong>Security Stamps:</strong> Token revocation
+                        system that invalidates all sessions when password is
+                        changed
                       </li>
                       <li>
-                        <strong>Device Verification:</strong> New devices require
-                        email verification before access
+                        <strong>Device Verification:</strong> New devices
+                        require email verification before access
                       </li>
                       <li>
-                        <strong>Email Verification:</strong> Required for account
-                        activation and security
+                        <strong>Email Verification:</strong> Required for
+                        account activation and security
                       </li>
                     </ul>
                   </div>
@@ -273,8 +290,9 @@ export default function PrivacyPage() {
                     </p>
                     <ul className="list-disc list-inside space-y-1 ml-4">
                       <li>
-                        Vault-level policies control when data becomes accessible
-                        (immediate, time-based, expiry-based, manual release)
+                        Vault-level policies control when data becomes
+                        accessible (immediate, time-based, expiry-based, manual
+                        release)
                       </li>
                       <li>
                         Item-level permissions (View/Edit) for granular access
@@ -300,16 +318,14 @@ export default function PrivacyPage() {
                         Database connections use encrypted connections (SSL/TLS)
                       </li>
                       <li>
-                        Documents stored on Cloudflare R2 with secure access
+                        Documents stored on S3 bucket with secure access
                         controls
                       </li>
                       <li>
                         API endpoints protected with authentication and
                         authorization
                       </li>
-                      <li>
-                        HTTPS encryption for all data in transit
-                      </li>
+                      <li>HTTPS encryption for all data in transit</li>
                     </ul>
                   </div>
                 </div>
@@ -324,7 +340,9 @@ export default function PrivacyPage() {
               </h2>
               <div className="text-slate-300 space-y-3 text-sm sm:text-base leading-relaxed">
                 <p>
-                  <strong className="text-slate-200">We do not sell your data.</strong>{" "}
+                  <strong className="text-slate-200">
+                    We do not sell your data.
+                  </strong>{" "}
                   We may share your information only in the following
                   circumstances:
                 </p>
@@ -367,16 +385,16 @@ export default function PrivacyPage() {
                     vault contents
                   </li>
                   <li>
-                    <strong>Delete:</strong> Delete items, vaults, or your entire
-                    account at any time
+                    <strong>Delete:</strong> Delete items, vaults, or your
+                    entire account at any time
                   </li>
                   <li>
-                    <strong>Export:</strong> Access your data through the Service
-                    interface
+                    <strong>Export:</strong> Access your data through the
+                    Service interface
                   </li>
                   <li>
-                    <strong>Revoke Access:</strong> Remove members from vaults or
-                    revoke device access
+                    <strong>Revoke Access:</strong> Remove members from vaults
+                    or revoke device access
                   </li>
                 </ul>
                 <p>
@@ -393,13 +411,13 @@ export default function PrivacyPage() {
               </h2>
               <div className="text-slate-300 space-y-3 text-sm sm:text-base leading-relaxed">
                 <p>
-                  We retain your data for as long as your account is active or as
-                  needed to provide the Service. When you delete:
+                  We retain your data for as long as your account is active or
+                  as needed to provide the Service. When you delete:
                 </p>
                 <ul className="list-disc list-inside space-y-2 ml-4">
                   <li>
-                    <strong>Items:</strong> Marked as deleted but may be retained
-                    temporarily for recovery purposes
+                    <strong>Items:</strong> Marked as deleted but may be
+                    retained temporarily for recovery purposes
                   </li>
                   <li>
                     <strong>Vaults:</strong> Permanently deleted along with all
@@ -407,8 +425,8 @@ export default function PrivacyPage() {
                   </li>
                   <li>
                     <strong>Account:</strong> All your data is deleted, except
-                    items in vaults you don't own (ownership transferred to vault
-                    owner)
+                    items in vaults you don't own (ownership transferred to
+                    vault owner)
                   </li>
                   <li>
                     <strong>Activity Logs:</strong> Deleted when you delete your
@@ -424,17 +442,15 @@ export default function PrivacyPage() {
                 8. Cookies and Tracking
               </h2>
               <div className="text-slate-300 space-y-3 text-sm sm:text-base leading-relaxed">
-                <p>
-                  We use minimal cookies and local storage for:
-                </p>
+                <p>We use minimal cookies and local storage for:</p>
                 <ul className="list-disc list-inside space-y-2 ml-4">
                   <li>
-                    <strong>Authentication:</strong> Storing JWT tokens for session
-                    management
+                    <strong>Authentication:</strong> Storing JWT tokens for
+                    session management
                   </li>
                   <li>
-                    <strong>Device Identification:</strong> Secure device IDs for
-                    verification purposes
+                    <strong>Device Identification:</strong> Secure device IDs
+                    for verification purposes
                   </li>
                   <li>
                     <strong>Preferences:</strong> User interface preferences
@@ -442,7 +458,8 @@ export default function PrivacyPage() {
                 </ul>
                 <p>
                   We do not use tracking cookies, advertising cookies, or
-                  third-party analytics that track your behavior across websites.
+                  third-party analytics that track your behavior across
+                  websites.
                 </p>
               </div>
             </section>
@@ -455,8 +472,8 @@ export default function PrivacyPage() {
               <div className="text-slate-300 space-y-3 text-sm sm:text-base leading-relaxed">
                 <p>
                   Eloomen is not intended for users under 18 years of age. We do
-                  not knowingly collect personal information from children. If you
-                  believe we have collected information from a child, please
+                  not knowingly collect personal information from children. If
+                  you believe we have collected information from a child, please
                   contact us immediately.
                 </p>
               </div>
@@ -515,7 +532,9 @@ export default function PrivacyPage() {
                     <li>Regularly review your vault members and permissions</li>
                     <li>Be cautious when sharing vaults with others</li>
                     <li>Log out from shared or public devices</li>
-                    <li>Keep your email account secure (used for verification)</li>
+                    <li>
+                      Keep your email account secure (used for verification)
+                    </li>
                     <li>Report suspicious activity immediately</li>
                   </ul>
                 </div>
@@ -543,4 +562,3 @@ export default function PrivacyPage() {
     </div>
   );
 }
-

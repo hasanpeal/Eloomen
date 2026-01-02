@@ -14,7 +14,7 @@ public class VaultItemService : IVaultItemService
     private readonly UserManager<User> _userManager;
     private readonly IVaultService _vaultService;
     private readonly IEncryptionService _encryptionService;
-    private readonly ICloudflareR2Service _r2Service;
+    private readonly IS3Service _s3Service;
     private readonly IConfiguration _configuration;
     private readonly ILogger<VaultItemService> _logger;
 
@@ -23,7 +23,7 @@ public class VaultItemService : IVaultItemService
         UserManager<User> userManager,
         IVaultService vaultService,
         IEncryptionService encryptionService,
-        ICloudflareR2Service r2Service,
+        IS3Service s3Service,
         IConfiguration configuration,
         ILogger<VaultItemService> logger)
     {
@@ -31,7 +31,7 @@ public class VaultItemService : IVaultItemService
         _userManager = userManager;
         _vaultService = vaultService;
         _encryptionService = encryptionService;
-        _r2Service = r2Service;
+        _s3Service = s3Service;
         _configuration = configuration;
         _logger = logger;
     }
@@ -287,10 +287,10 @@ public class VaultItemService : IVaultItemService
         item.DeletedAt = DateTime.UtcNow;
         item.DeletedBy = userId;
 
-        // Optionally delete document from R2
+        // Optionally delete document from S3
         if (item.Document != null && item.ItemType == ItemType.Document)
         {
-            await _r2Service.DeleteFileAsync(item.Document.ObjectKey);
+            await _s3Service.DeleteFileAsync(item.Document.ObjectKey);
         }
 
         await _dbContext.SaveChangesAsync();
@@ -405,7 +405,7 @@ public class VaultItemService : IVaultItemService
         var documentId = Guid.NewGuid().ToString();
         var objectKey = $"vaults/{item.VaultId}/documents/{documentId}/{file.FileName}";
 
-        await _r2Service.UploadFileAsync(file, objectKey);
+        await _s3Service.UploadFileAsync(file, objectKey);
 
         var document = new VaultDocument
         {
@@ -588,7 +588,7 @@ public class VaultItemService : IVaultItemService
     {
         if (dto.DeleteDocument == true && item.Document != null)
         {
-            await _r2Service.DeleteFileAsync(item.Document.ObjectKey);
+            await _s3Service.DeleteFileAsync(item.Document.ObjectKey);
             _dbContext.VaultDocuments.Remove(item.Document);
         }
 
@@ -596,7 +596,7 @@ public class VaultItemService : IVaultItemService
         {
             if (item.Document != null)
             {
-                await _r2Service.DeleteFileAsync(item.Document.ObjectKey);
+                await _s3Service.DeleteFileAsync(item.Document.ObjectKey);
                 _dbContext.VaultDocuments.Remove(item.Document);
             }
 
@@ -741,7 +741,7 @@ public class VaultItemService : IVaultItemService
         // Map item-specific data
         if (item.Document != null)
         {
-            var downloadUrl = await _r2Service.GetPresignedUrlAsync(item.Document.ObjectKey, 60);
+            var downloadUrl = await _s3Service.GetPresignedUrlAsync(item.Document.ObjectKey, 60);
             dto.Document = new VaultDocumentDTO
             {
                 ObjectKey = item.Document.ObjectKey,

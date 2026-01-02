@@ -16,7 +16,7 @@ public class VaultService : IVaultService
     private readonly IEmailService _emailService;
     private readonly IConfiguration _config;
     private readonly ILogger<VaultService> _logger;
-    private readonly ICloudflareR2Service _r2Service;
+    private readonly IS3Service _s3Service;
 
     public VaultService(
         ApplicationDBContext dbContext,
@@ -24,14 +24,14 @@ public class VaultService : IVaultService
         IEmailService emailService,
         IConfiguration config,
         ILogger<VaultService> logger,
-        ICloudflareR2Service r2Service)
+        IS3Service s3Service)
     {
         _dbContext = dbContext;
         _userManager = userManager;
         _emailService = emailService;
         _config = config;
         _logger = logger;
-        _r2Service = r2Service;
+        _s3Service = s3Service;
     }
 
     public async Task<VaultResponseDTO?> GetVaultByIdAsync(int vaultId, string userId)
@@ -319,7 +319,7 @@ public class VaultService : IVaultService
         if (vault.OwnerId != userId)
             return false;
 
-        // Delete all documents from Cloudflare R2 before deleting items
+        // Delete all documents from S3 bucket before deleting items
         var itemsWithDocuments = vault.Items
             .Where(i => i.Document != null && i.ItemType == ItemType.Document)
             .ToList();
@@ -330,15 +330,15 @@ public class VaultService : IVaultService
             {
                 try
                 {
-                    await _r2Service.DeleteFileAsync(item.Document.ObjectKey);
-                    _logger.LogInformation("Deleted document {ObjectKey} from R2 for vault {VaultId}", 
+                    await _s3Service.DeleteFileAsync(item.Document.ObjectKey);
+                    _logger.LogInformation("Deleted document {ObjectKey} from S3 for vault {VaultId}", 
                         item.Document.ObjectKey, vaultId);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to delete document {ObjectKey} from R2 for vault {VaultId}. Continuing with vault deletion.", 
+                    _logger.LogWarning(ex, "Failed to delete document {ObjectKey} from S3 for vault {VaultId}. Continuing with vault deletion.", 
                         item.Document.ObjectKey, vaultId);
-                    // Continue with deletion even if R2 deletion fails
+                    // Continue with deletion even if S3 deletion fails
                 }
             }
         }

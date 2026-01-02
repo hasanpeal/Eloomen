@@ -48,8 +48,8 @@
     ┌────┴────┬──────────────┬──────────────┐
     │         │              │              │
 ┌───▼───┐ ┌──▼────┐   ┌──────▼──────┐
-│PostgreSQL│ │Cloudflare│   │  SendGrid   │
-│(Supabase)│ │   R2      │   │   Email     │
+│PostgreSQL│ │  S3      │   │  SendGrid   │
+│(Supabase)│ │  Bucket  │   │   Email     │
 └─────────┘ └──────────┘   └────────────┘
 ```
 
@@ -72,14 +72,14 @@
 - **Database**: PostgreSQL 15+ (via Supabase)
 - **Authentication**: ASP.NET Core Identity + Custom JWT implementation
 - **Authorization**: Policy-based with role hierarchy (Owner → Admin → Member)
-- **File Storage**: Cloudflare R2 (S3-compatible object storage)
+- **File Storage**: S3 bucket for document storage
 - **Email**: SendGrid integration for transactional emails
 - **API Documentation**: Swagger/OpenAPI
 
 #### **Infrastructure & DevOps**
 
 - **Database**: Supabase (PostgreSQL + Storage)
-- **Object Storage**: Cloudflare R2
+- **Object Storage**: S3 bucket
 - **CI/CD**: GitHub Actions (build, test, deploy)
 - **Migrations**: Automatic EF Core migrations on startup
 - **Logging**: Structured logging with ILogger
@@ -145,7 +145,7 @@ Users
 │   ├── VaultInvites
 │   ├── VaultPolicies
 │   ├── VaultItems
-│   │   ├── VaultDocuments (Cloudflare R2 references)
+│   │   ├── VaultDocuments (S3 bucket references)
 │   │   ├── VaultPasswords (encrypted)
 │   │   ├── VaultNotes (encrypted)
 │   │   ├── VaultLinks
@@ -202,7 +202,7 @@ Robust invitation workflow with:
 
 ### 4. **File Upload & Storage**
 
-- **Cloudflare R2 Integration**: S3-compatible API for document storage
+- **S3 Bucket Integration**: Secure document storage with signed URLs
 - **Signed URLs**: Time-limited download URLs for secure file access
 - **Metadata Tracking**: File size, MIME type, original filename
 - **Cleanup**: Automatic file deletion on item/vault deletion
@@ -275,7 +275,7 @@ Eloomen/
 - **Node.js** 20+ and npm
 - **.NET 9 SDK**
 - **PostgreSQL** 15+ (or Supabase account)
-- **Cloudflare R2** account (for file storage)
+- **AWS S3** bucket (for file storage)
 - **SendGrid** account (for emails)
 
 ### Environment Setup
@@ -292,8 +292,8 @@ Eloomen/
        "Audience": "EloomenUsers",
        "SigningKey": "your-secret-key"
      },
-     "CloudflareR2": {
-       "Endpoint": "your-r2-endpoint",
+     "S3": {
+       "Endpoint": "your-s3-endpoint",
        "AccessKey": "your-access-key",
        "SecretKey": "your-secret-key",
        "BucketName": "your-bucket"
