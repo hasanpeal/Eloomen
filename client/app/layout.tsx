@@ -3,6 +3,7 @@ import { Montserrat } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "./contexts/AuthContext";
 import { Toaster } from "react-hot-toast";
+import { Analytics } from "@vercel/analytics/next";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -10,7 +11,7 @@ const montserrat = Montserrat({
   display: "swap",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://eloomen.com";
+const siteUrl = "https://eloomen.com";
 const siteName = "Eloomen";
 const siteDescription =
   "Secure your digital life. Share it on your terms. Eloomen is a secure, relationship-based digital vault platform for storing and sharing sensitive data with time-based and conditional access policies. Perfect for families, partners, and professionals.";
@@ -18,8 +19,7 @@ const siteDescription =
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default:
-      "Eloomen",
+    default: "Eloomen",
     template: "%s | Eloomen",
   },
   description: siteDescription,
@@ -166,6 +166,7 @@ export default function RootLayout({
       >
         <AuthProvider>{children}</AuthProvider>
         <Toaster position="top-center" toastOptions={{}} />
+        <Analytics />
       </body>
     </html>
   );
