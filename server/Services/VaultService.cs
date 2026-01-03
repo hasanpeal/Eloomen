@@ -455,6 +455,14 @@ public class VaultService : IVaultService
             // Log but don't fail the deletion
         }
 
+        // Delete all logs for this vault first (since VaultLog has Restrict delete behavior)
+        var vaultLogs = await _dbContext.VaultLogs.Where(l => l.VaultId == vaultId).ToListAsync();
+        if (vaultLogs.Any())
+        {
+            _dbContext.VaultLogs.RemoveRange(vaultLogs);
+            await _dbContext.SaveChangesAsync();
+        }
+
         // Actually delete the vault (not archive) - cascade delete will handle items, members, invites, policy
         _dbContext.Vaults.Remove(vault);
         await _dbContext.SaveChangesAsync();

@@ -17,7 +17,7 @@ import ContactModal from "../components/ContactModal";
 import NotificationsModal from "../components/NotificationsModal";
 
 export default function DashboardPage() {
-  const { isLoading, isAuthenticated, user, logout } = useAuth();
+  const { isLoading, isAuthenticated, logout } = useAuth();
   const router = useRouter();
   const [vaults, setVaults] = useState<Vault[]>([]);
   const [loading, setLoading] = useState(true);

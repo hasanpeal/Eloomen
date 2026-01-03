@@ -2,7 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { VaultItem, apiClient } from "../lib/api";
-import { FileText, Key, StickyNote, Link as LinkIcon, Wallet, Package, X } from "lucide-react";
+import {
+  FileText,
+  Key,
+  StickyNote,
+  Link as LinkIcon,
+  Wallet,
+  Package,
+  X,
+} from "lucide-react";
 
 interface ViewItemModalProps {
   isOpen: boolean;
@@ -21,7 +29,7 @@ export default function ViewItemModal({
   vaultId,
   onEdit,
   onDelete,
-  canEdit = false,
+  canEdit = false, // eslint-disable-line @typescript-eslint/no-unused-vars
 }: ViewItemModalProps) {
   const [fullItem, setFullItem] = useState<VaultItem | null>(item);
   const [loading, setLoading] = useState(false);
@@ -392,4 +400,3 @@ export default function ViewItemModal({
     </div>
   );
 }
-
