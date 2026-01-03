@@ -608,30 +608,7 @@ Eloomen/
 
 ### Running Locally
 
-#### Quick Start (Recommended)
-
-Run both server and client simultaneously with live reload:
-
-```bash
-./start.sh
-```
-
-Or using npm:
-
-```bash
-npm run dev
-```
-
-This will start:
-
-- **Backend (.NET)**: `http://localhost:3000` with hot reload via `dotnet watch`
-- **Frontend (Next.js)**: `http://localhost:3001` with hot reload via Next.js dev server
-
-Both servers automatically reload when you make changes to the code. Press `Ctrl+C` to stop both servers.
-
-#### Manual Start (Alternative)
-
-If you prefer to run them separately:
+Run both server and client separately in different terminals:
 
 ```bash
 # Backend
