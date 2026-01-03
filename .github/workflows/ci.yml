@@ -31,7 +31,9 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Restore dependencies
-        run: dotnet restore server/server.sln
+        run: |
+          dotnet restore server/server.sln
+          dotnet restore server/Tests/server.Tests.csproj
         working-directory: .
 
       - name: Build solution
@@ -39,7 +41,7 @@ jobs:
         working-directory: .
 
       - name: Run tests
-        run: dotnet test server/Tests/server.Tests.csproj --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
+        run: dotnet test server/Tests/server.Tests.csproj --no-restore --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
         working-directory: .
 
       - name: Upload test results

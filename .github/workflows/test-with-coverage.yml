@@ -23,7 +23,9 @@ jobs:
           dotnet-version: "9.0.x"
 
       - name: Restore dependencies
-        run: dotnet restore server/server.sln
+        run: |
+          dotnet restore server/server.sln
+          dotnet restore server/Tests/server.Tests.csproj
         working-directory: .
 
       - name: Build solution
@@ -36,7 +38,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           dotnet test server/Tests/server.Tests.csproj \
-            --no-build \
+            --no-restore \
             --configuration Release \
             --verbosity normal \
             --collect:"XPlat Code Coverage" \
