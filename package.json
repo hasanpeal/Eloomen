@@ -1,0 +1,19 @@
+{
+  "name": "eloomen",
+  "version": "1.0.0",
+  "description": "Eloomen - Secure Digital Vault Platform",
+  "scripts": {
+    "dev": "./start.sh",
+    "start": "./start.sh",
+    "install:all": "cd client && npm install && cd ../server && dotnet restore",
+    "build": "cd client && npm run build && cd ../server && dotnet build",
+    "clean": "cd client && rm -rf .next node_modules && cd ../server && dotnet clean"
+  },
+  "keywords": [
+    "digital-vault",
+    "secure-storage",
+    "encryption"
+  ],
+  "author": "Eloomen Team",
+  "license": "MIT"
+}
