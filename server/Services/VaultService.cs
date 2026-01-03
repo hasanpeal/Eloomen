@@ -285,7 +285,8 @@ public class VaultService : IVaultService
             // Check if release status changed from non-released to released
             if (oldReleaseStatus != ReleaseStatus.Released && vault.Policy.ReleaseStatus == ReleaseStatus.Released)
             {
-                // Send notification to all vault members
+                // Send email notification to all vault members
+                // Note: Database trigger automatically creates notifications, so we only send emails here
                 try
                 {
                     var members = await _dbContext.VaultMembers
@@ -301,15 +302,6 @@ public class VaultService : IVaultService
                                 member.User.Email,
                                 member.User.UserName ?? member.User.Email,
                                 vault.Name
-                            );
-                            
-                            // Save notification (trigger also creates one, but this ensures it's created)
-                            await _notificationService.CreateNotificationAsync(
-                                member.User.Id,
-                                "Vault Released",
-                                $"The vault \"{vault.Name}\" has been released and is now accessible.",
-                                "VaultReleased",
-                                vaultId: vaultId
                             );
                         }
                     }
@@ -1422,7 +1414,8 @@ public class VaultService : IVaultService
                 policy.ReleasedAt = DateTime.UtcNow;
                 await _dbContext.SaveChangesAsync();
                 
-                // Send notification to all vault members if status just changed to released
+                // Send email notification to all vault members if status just changed to released
+                // Note: Database trigger automatically creates notifications, so we only send emails here
                 if (!wasReleased)
                 {
                     try
@@ -1445,15 +1438,6 @@ public class VaultService : IVaultService
                                         member.User.Email,
                                         member.User.UserName ?? member.User.Email,
                                         vault.Name
-                                    );
-                                    
-                                    // Save notification (trigger also creates one, but this ensures it's created)
-                                    await _notificationService.CreateNotificationAsync(
-                                        member.User.Id,
-                                        "Vault Released",
-                                        $"The vault \"{vault.Name}\" has been released and is now accessible.",
-                                        "VaultReleased",
-                                        vaultId: policy.VaultId
                                     );
                                 }
                             }
@@ -1612,6 +1596,8 @@ public class VaultService : IVaultService
         vault.Policy.ReleaseStatus = ReleaseStatus.Released;
         vault.Policy.ReleasedAt = DateTime.UtcNow;
         vault.Policy.ReleasedById = userId;
+        // Change PolicyType to Immediate when vault is released
+        vault.Policy.PolicyType = PolicyType.Immediate;
 
         await _dbContext.SaveChangesAsync();
 
@@ -1626,7 +1612,8 @@ public class VaultService : IVaultService
         _dbContext.VaultLogs.Add(vaultLog);
         await _dbContext.SaveChangesAsync();
 
-        // Send notification to all vault members
+        // Send email notification to all vault members
+        // Note: Database trigger automatically creates notifications, so we only send emails here
         try
         {
             var members = await _dbContext.VaultMembers
@@ -1642,15 +1629,6 @@ public class VaultService : IVaultService
                         member.User.Email,
                         member.User.UserName ?? member.User.Email,
                         vault.Name
-                    );
-                    
-                    // Save notification (trigger also creates one, but this ensures it's created)
-                    await _notificationService.CreateNotificationAsync(
-                        member.User.Id,
-                        "Vault Released",
-                        $"The vault \"{vault.Name}\" has been released and is now accessible.",
-                        "VaultReleased",
-                        vaultId: vaultId
                     );
                 }
             }
