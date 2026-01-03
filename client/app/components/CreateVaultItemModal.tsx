@@ -206,7 +206,7 @@ export default function CreateVaultItemModal({
           visibilities: visibilityArray.length > 0 ? visibilityArray : undefined,
         };
         await apiClient.updateVaultItem(vaultId, editingItem.id, data);
-        toast.success("Item updated successfully");
+        toast.success("Item updated");
       } else {
         // Build visibilities array for all members (exclude owners - they always get Edit)
         const visibilityArray: ItemVisibilityRequest[] = [];
@@ -247,7 +247,7 @@ export default function CreateVaultItemModal({
           visibilities: visibilityArray.length > 0 ? visibilityArray : undefined,
         };
         await apiClient.createVaultItem(vaultId, data);
-        toast.success("Item created successfully");
+        toast.success("Item created");
       }
 
       onSuccess();

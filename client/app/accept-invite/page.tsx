@@ -25,7 +25,7 @@ function AcceptInviteContent() {
       setProcessing(true);
       await apiClient.acceptInvite(inviteToken, inviteEmail);
       setSuccess(true);
-      toast.success("Invite accepted successfully!");
+      toast.success("Invite accepted");
       setTimeout(() => {
         router.push("/dashboard");
       }, 2000);

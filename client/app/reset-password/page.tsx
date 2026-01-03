@@ -57,14 +57,14 @@ function ResetPasswordContent() {
 
       if (response.message) {
         setSuccess(true);
-        toast.success("Password reset successfully. Log in to continue.");
+        toast.success("Password reset");
         router.push("/login");
       }
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "Failed to reset password. Please try again.";
+          : "Failed to reset password";
       setError(errorMessage);
     } finally {
       setIsLoading(false);

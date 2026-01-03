@@ -122,7 +122,7 @@ function SignupContent() {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "Registration failed. Please try again.";
+          : "Registration failed";
       setError(errorMessage);
       setIsLoading(false);
     }

@@ -59,20 +59,20 @@ function VerifyDeviceContent() {
           sessionStorage.removeItem("pendingInviteToken");
         }
         
-        toast.success("Device verified successfully.");
+        toast.success("Device verified");
         
         // Redirect based on whether invite was accepted
         if (response.inviteAccepted) {
           router.push("/dashboard");
         } 
       } else {
-        setError(response.message || "Verification failed. Please try again.");
+        setError(response.message || "Verification failed");
       }
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "Verification failed. Please try again.";
+          : "Verification failed";
       setError(errorMessage);
     } finally {
       setIsLoading(false);

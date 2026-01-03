@@ -41,18 +41,18 @@ export default function ContactModal({ isOpen, onClose, isPublic = false }: Cont
     
     if (usePublicEndpoint) {
       if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
-        toast.error("Please fill in all fields");
+        toast.error("All fields required");
         return;
       }
       // Basic email validation
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email.trim())) {
-        toast.error("Please enter a valid email address");
+        toast.error("Email required");
         return;
       }
     } else {
       if (!formData.name.trim() || !formData.message.trim()) {
-        toast.error("Please fill in all fields");
+        toast.error("All fields required");
         return;
       }
     }
@@ -68,14 +68,14 @@ export default function ContactModal({ isOpen, onClose, isPublic = false }: Cont
       } else {
         await apiClient.sendContact(formData.name.trim(), formData.message.trim());
       }
-      toast.success("Message sent successfully!");
+      toast.success("Message sent");
       setFormData({ name: "", email: "", message: "" });
       onClose();
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "Failed to send message. Please try again.";
+          : "Failed to send message";
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);

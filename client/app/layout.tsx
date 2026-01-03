@@ -165,7 +165,9 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>{children}</AuthProvider>
-        <Toaster position="top-center" toastOptions={{}} />
+        <Toaster 
+          position="top-center" 
+        />
         <Analytics />
       </body>
     </html>

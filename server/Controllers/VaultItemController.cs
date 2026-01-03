@@ -42,7 +42,7 @@ public class VaultItemController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting vault items for vault {VaultId}: {Message}", vaultId, ex.Message);
-            return StatusCode(500, new { message = "Failed to retrieve items. Please try again." });
+            return StatusCode(500, new { message = "Failed to retrieve items" });
         }
     }
 
@@ -62,7 +62,7 @@ public class VaultItemController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting item {ItemId} from vault {VaultId}: {Message}", itemId, vaultId, ex.Message);
-            return StatusCode(500, new { message = "Failed to retrieve item. Please try again." });
+            return StatusCode(500, new { message = "Failed to retrieve item" });
         }
     }
 
@@ -121,7 +121,7 @@ public class VaultItemController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating item in vault {VaultId}: {Message}", vaultId, ex.Message);
-            return StatusCode(500, new { message = "Failed to create item. Please try again." });
+            return StatusCode(500, new { message = "Failed to create item" });
         }
     }
 
@@ -177,7 +177,7 @@ public class VaultItemController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating item {ItemId} in vault {VaultId}: {Message}", itemId, vaultId, ex.Message);
-            return StatusCode(500, new { message = "Failed to update item. Please try again." });
+            return StatusCode(500, new { message = "Failed to update item" });
         }
     }
 
@@ -197,7 +197,7 @@ public class VaultItemController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting item {ItemId} from vault {VaultId}: {Message}", itemId, vaultId, ex.Message);
-            return StatusCode(500, new { message = "Failed to delete item. Please try again." });
+            return StatusCode(500, new { message = "Failed to delete item" });
         }
     }
 
@@ -210,14 +210,14 @@ public class VaultItemController : ControllerBase
             var result = await _itemService.RestoreItemAsync(itemId, userId);
             
             if (!result)
-                return BadRequest("Item cannot be restored (not found, not deleted, or recovery window expired)");
+                return BadRequest("Cannot restore item");
 
-            return Ok(new { message = "Item restored successfully" });
+            return Ok(new { message = "Item restored" });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error restoring item {ItemId} in vault {VaultId}: {Message}", itemId, vaultId, ex.Message);
-            return StatusCode(500, new { message = "Failed to restore item. Please try again." });
+            return StatusCode(500, new { message = "Failed to restore item" });
         }
     }
 }

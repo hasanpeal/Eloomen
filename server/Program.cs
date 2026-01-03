@@ -267,7 +267,11 @@ if (app.Environment.IsDevelopment())
 // Middleware pipeline
 // --------------------
 app.UseCors("AllowFrontend");
-app.UseHttpsRedirection();
+// Only redirect to HTTPS in production
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
 app.UseAuthorization();
 

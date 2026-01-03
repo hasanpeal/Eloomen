@@ -57,7 +57,7 @@ public class AccountController : ControllerBase
         if (await _userManager.FindByEmailAsync(dto.Email) != null ||
             await _userManager.FindByNameAsync(dto.Username) != null)
         {
-            return BadRequest("User already exists");
+            return BadRequest("Account already exists");
         }
 
         var user = new User
@@ -138,7 +138,7 @@ public class AccountController : ControllerBase
         {
             requireVerification = true,
             verificationType = "Email",
-            message = "Check your email for verification.",
+            message = "Verification email sent",
             inviteAccepted = !string.IsNullOrEmpty(dto.InviteToken)
         });
     }
@@ -194,7 +194,7 @@ public class AccountController : ControllerBase
             {
                 requireVerification = true,
                 verificationType = "Device",
-                message = "New device detected. Check your email and verify."
+                message = "Device verification required"
             });
         }
         // Email verification check
@@ -220,7 +220,7 @@ public class AccountController : ControllerBase
             {
                 requireVerification = true,
                 verificationType = "Email",
-                message = "Email not verified. Check your email and verify."    
+                message = "Email verification required"    
             });
         }
         // Account lockout check
@@ -380,12 +380,12 @@ public class AccountController : ControllerBase
         var user = await _userManager.FindByEmailAsync(dto.Email);
         if (user == null)
         {
-            return BadRequest("Invalid email or code");
+            return BadRequest("Invalid verification code");
         }
 
         if (user.EmailConfirmed)
         {
-            return Ok(new { Message = "Email is already verified" });
+            return Ok(new { Message = "Email already verified" });
         }
         
         var verificationCode = await VerifyCodeAsync(user.Id, dto.Code, "EmailVerification");
@@ -419,13 +419,13 @@ public class AccountController : ControllerBase
                 _dbContext.AccountLogs.Add(accountLog);
                 await _dbContext.SaveChangesAsync();
                 
-                return Ok(new { Message = "Email verified successfully" });
+                return Ok(new { Message = "Email verified" });
             }
             
             return StatusCode(500, "Failed to confirm email");
         }
 
-        return BadRequest("Invalid or expired code");
+        return BadRequest("Invalid verification code");
     }
 
     [HttpPost("resend-verification")]
@@ -440,12 +440,12 @@ public class AccountController : ControllerBase
         if (user == null)
         {
             // Don't reveal if email exists for security
-            return Ok(new { Message = "If the email exists, a verification email has been sent." });
+            return Ok(new { Message = "Verification email sent if account exists" });
         }
 
         if (user.EmailConfirmed)
         {
-            return Ok(new { Message = "Email is already verified" });
+            return Ok(new { Message = "Email already verified" });
         }
 
         // Generate new verification code
@@ -463,7 +463,7 @@ public class AccountController : ControllerBase
             return StatusCode(500, "Failed to send email");
         }
 
-        return Ok(new { Message = "If the email exists, a verification email has been sent." });
+        return Ok(new { Message = "Verification email sent if account exists" });
     }
 
     [HttpPost("verify-device")]
@@ -488,7 +488,7 @@ public class AccountController : ControllerBase
 
         if (user == null)
         {
-            return BadRequest("User not found. Please check your username or email.");
+            return BadRequest("Account not found");
         }
 
         // Get device identifier
@@ -500,19 +500,19 @@ public class AccountController : ControllerBase
 
         if (device == null)
         {
-            return BadRequest("Device not found. Please log in again.");
+            return BadRequest("Device not found");
         }
 
         if (device.IsVerified)
         {
-            return Ok(new { Message = "Device is already verified" });
+            return Ok(new { Message = "Device already verified" });
         }
 
         var verificationCode = await VerifyCodeAsync(user.Id, dto.Code, "DeviceVerification");
 
         if (verificationCode == null)
         {
-            return BadRequest("Invalid or expired verification code");
+            return BadRequest("Invalid verification code");
         }
 
         // Verify the device
@@ -568,7 +568,7 @@ public class AccountController : ControllerBase
         if (user == null)
         {
             // Don't reveal if email exists for security
-            return Ok(new { Message = "If the email exists, a password reset code has been sent." });
+            return Ok(new { Message = "Reset code sent if account exists" });
         }
 
         // Generate password reset code
@@ -596,7 +596,7 @@ public class AccountController : ControllerBase
         _dbContext.AccountLogs.Add(accountLog);
         await _dbContext.SaveChangesAsync();
 
-        return Ok(new { Message = "If the email exists, a password reset code has been sent." });
+        return Ok(new { Message = "Reset code sent if account exists" });
     }
 
     [HttpPost("reset-password")]
@@ -610,7 +610,7 @@ public class AccountController : ControllerBase
         var user = await _userManager.FindByEmailAsync(dto.Email);
         if (user == null)
         {
-            return BadRequest("Invalid email or code");
+            return BadRequest("Invalid reset code");
         }
 
         // Verify code but don't mark as used yet
@@ -641,7 +641,7 @@ public class AccountController : ControllerBase
                 await _dbContext.SaveChangesAsync();
             }
             
-            return BadRequest("Invalid or expired verification code");
+            return BadRequest("Invalid reset code");
         }
 
         // Reset password directly - validate password BEFORE marking code as used
@@ -687,7 +687,7 @@ public class AccountController : ControllerBase
             _dbContext.AccountLogs.Add(accountLog);
             await _dbContext.SaveChangesAsync();
 
-            return Ok(new { message = "Password reset successfully. Please log in with your new password." });
+            return Ok(new { message = "Password reset" });
         }
 
         // Password validation failed - return errors without marking code as used
@@ -773,7 +773,7 @@ public class AccountController : ControllerBase
                 // Log but don't fail the password change
             }
 
-            return Ok(new { Message = "Password changed successfully" });
+            return Ok(new { Message = "Password changed" });
         }
 
         return BadRequest(result.Errors.Select(e => e.Description).ToArray());
@@ -822,7 +822,7 @@ public class AccountController : ControllerBase
         _dbContext.AccountLogs.Add(accountLog);
         await _dbContext.SaveChangesAsync();
 
-        return Ok(new { Message = "Device access revoked successfully" });
+        return Ok(new { Message = "Device revoked" });
     }
 
     [Authorize]
@@ -935,7 +935,7 @@ public class AccountController : ControllerBase
             var existingUser = await _userManager.FindByNameAsync(dto.Username);
             if (existingUser != null && existingUser.Id != userId)
             {
-                return BadRequest("Username is already taken");
+                return BadRequest("Username unavailable");
             }
             user.UserName = dto.Username;
             changes.Add("Username");
@@ -947,7 +947,7 @@ public class AccountController : ControllerBase
             var existingUser = await _userManager.FindByEmailAsync(dto.Email);
             if (existingUser != null && existingUser.Id != userId)
             {
-                return BadRequest("Email is already taken");
+                return BadRequest("Email unavailable");
             }
             user.Email = dto.Email;
             user.EmailConfirmed = false; // Require email verification for new email
@@ -995,7 +995,7 @@ public class AccountController : ControllerBase
             }
         }
 
-        return Ok(new { Message = "Profile updated successfully" });
+        return Ok(new { Message = "Profile updated" });
     }
 
     [Authorize]
@@ -1152,7 +1152,7 @@ public class AccountController : ControllerBase
             return BadRequest(result.Errors.Select(e => e.Description));
         }
 
-        return Ok(new { Message = "Account deleted successfully" });
+        return Ok(new { Message = "Account deleted" });
     }
 
     [Authorize]
@@ -1203,7 +1203,7 @@ public class AccountController : ControllerBase
             Path = "/"
         });
 
-        return Ok(new { Message = "Logged out successfully" });
+        return Ok(new { Message = "Logged out" });
     }
 
     // --------------------

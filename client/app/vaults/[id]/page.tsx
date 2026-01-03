@@ -245,7 +245,7 @@ export default function VaultDetailPage() {
             if (now > expiresAt) {
               setAccessDenied(true);
               setVault(null);
-              toast.error("Access denied. This vault has expired.");
+              toast.error("Access denied");
               setTimeout(() => {
                 router.push("/dashboard");
               }, 2000);
@@ -330,7 +330,7 @@ export default function VaultDetailPage() {
     const canEdit =
       vault.userPrivilege === "Owner" || vault.userPrivilege === "Admin";
     if (!canEdit) {
-      toast.error("You don't have permission to edit this vault");
+      toast.error("Permission denied");
       return;
     }
 
@@ -338,7 +338,7 @@ export default function VaultDetailPage() {
       const updated = await apiClient.updateVault(vaultId, editForm);
       setVault(updated);
       setShowEditModal(false);
-      toast.success("Vault updated successfully");
+      toast.success("Vault updated");
     } catch (error) {
       if (error instanceof SessionExpiredError) {
         return;
@@ -355,7 +355,7 @@ export default function VaultDetailPage() {
     setDeletingVault(true);
     try {
       await apiClient.deleteVault(vaultId);
-      toast.success("Vault deleted successfully");
+      toast.success("Vault deleted");
       router.push("/dashboard");
     } catch (error: unknown) {
       // Don't show toast for session expiration - it's already handled in API client
@@ -374,7 +374,7 @@ export default function VaultDetailPage() {
     e.preventDefault();
     try {
       await apiClient.createInvite(vaultId, inviteForm);
-      toast.success("Invite sent successfully!");
+      toast.success("Invite sent");
       setShowInviteModal(false);
       setInviteForm({
         inviteeEmail: "",
@@ -410,7 +410,7 @@ export default function VaultDetailPage() {
   const handleResendInvite = async (inviteId: number) => {
     try {
       await apiClient.resendInvite(vaultId, inviteId);
-      toast.success("Invite resent successfully");
+      toast.success("Invite resent");
       loadVaultData();
     } catch (error) {
       if (error instanceof SessionExpiredError) {
@@ -488,7 +488,7 @@ export default function VaultDetailPage() {
       await apiClient.transferOwnership(vaultId, {
         memberId: transferMember.id,
       });
-      toast.success("Ownership transferred successfully");
+      toast.success("Ownership transferred");
       setShowTransferModal(false);
       setTransferMember(null);
       loadVaultData();
@@ -505,7 +505,7 @@ export default function VaultDetailPage() {
   const handleLeaveVault = async () => {
     try {
       await apiClient.leaveVault(vaultId);
-      toast.success("Left vault successfully");
+      toast.success("Left vault");
       router.push("/dashboard");
     } catch (error) {
       if (error instanceof SessionExpiredError) {
@@ -522,7 +522,7 @@ export default function VaultDetailPage() {
   const handleReleaseVaultManually = async () => {
     try {
       await apiClient.releaseVaultManually(vaultId);
-      toast.success("Vault released successfully");
+      toast.success("Vault released");
       loadVaultData();
     } catch (error) {
       if (error instanceof SessionExpiredError) {
@@ -2105,7 +2105,7 @@ export default function VaultDetailPage() {
           setDeleting(true);
           try {
             await apiClient.deleteVaultItem(vaultId, deletingItem.id);
-            toast.success("Item deleted successfully");
+            toast.success("Item deleted");
             setShowDeleteModal(false);
             setDeletingItem(null);
             loadVaultData();
