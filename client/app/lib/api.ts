@@ -202,7 +202,42 @@ class ApiClient {
         throw new Error(errorMessage);
       }
 
-      return response.json();
+      // Handle empty responses (e.g., 204 No Content for DELETE requests)
+      const contentType = response.headers.get("content-type");
+      const contentLength = response.headers.get("content-length");
+
+      // If no content or empty body, return void/undefined
+      if (response.status === 204 || contentLength === "0") {
+        return undefined as T;
+      }
+
+      // If content-type is not JSON, check if there's any content
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        if (!text || text.trim().length === 0) {
+          return undefined as T;
+        }
+        // If there's text but not JSON, try to parse as JSON anyway
+        try {
+          return JSON.parse(text) as T;
+        } catch {
+          return undefined as T;
+        }
+      }
+
+      // For JSON responses, parse normally
+      const text = await response.text();
+      if (!text || text.trim().length === 0) {
+        return undefined as T;
+      }
+
+      try {
+        return JSON.parse(text) as T;
+      } catch (error) {
+        // If JSON parsing fails, return undefined instead of throwing
+        console.warn("Failed to parse JSON response:", error);
+        return undefined as T;
+      }
     } catch (error) {
       // Re-throw SessionExpiredError as-is so callers can handle it
       if (error instanceof SessionExpiredError) {
@@ -488,7 +523,10 @@ class ApiClient {
     });
   }
 
-  async sendContact(name: string, message: string): Promise<{ message: string }> {
+  async sendContact(
+    name: string,
+    message: string
+  ): Promise<{ message: string }> {
     return this.request<{ message: string }>("/contact", {
       method: "POST",
       body: JSON.stringify({
@@ -498,7 +536,11 @@ class ApiClient {
     });
   }
 
-  async sendPublicContact(name: string, email: string, message: string): Promise<{ message: string }> {
+  async sendPublicContact(
+    name: string,
+    email: string,
+    message: string
+  ): Promise<{ message: string }> {
     // Public endpoint doesn't require authentication
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
     const response = await fetch(`${API_BASE_URL}/contact/public`, {
@@ -514,7 +556,9 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: "Failed to send message" }));
+      const errorData = await response
+        .json()
+        .catch(() => ({ message: "Failed to send message" }));
       throw new Error(errorData.message || "Failed to send message");
     }
 
@@ -522,9 +566,12 @@ class ApiClient {
   }
 
   async getNotifications(unreadOnly: boolean = false): Promise<Notification[]> {
-    return this.request<Notification[]>(`/notification?unreadOnly=${unreadOnly}`, {
-      method: "GET",
-    });
+    return this.request<Notification[]>(
+      `/notification?unreadOnly=${unreadOnly}`,
+      {
+        method: "GET",
+      }
+    );
   }
 
   async markNotificationAsRead(id: number): Promise<{ message: string }> {

@@ -21,6 +21,7 @@ import CreateVaultItemModal from "../../components/CreateVaultItemModal";
 import DeleteItemModal from "../../components/DeleteItemModal";
 import ViewItemModal from "../../components/ViewItemModal";
 import DeleteVaultModal from "../../components/DeleteVaultModal";
+import DeleteMemberModal from "../../components/DeleteMemberModal";
 import {
   Plus,
   ChevronDown,
@@ -82,6 +83,11 @@ export default function VaultDetailPage() {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferMember, setTransferMember] = useState<VaultMember | null>(
+    null
+  );
+  const [showDeleteMemberModal, setShowDeleteMemberModal] = useState(false);
+  const [deletingMember, setDeletingMember] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<VaultMember | null>(
     null
   );
   const [isTabDropdownOpen, setIsTabDropdownOpen] = useState(false);
@@ -416,19 +422,32 @@ export default function VaultDetailPage() {
     }
   };
 
-  const handleRemoveMember = async (memberId: number) => {
-    if (!confirm("Are you sure you want to remove this member?")) return;
+  const handleRemoveMemberClick = (member: VaultMember) => {
+    setMemberToDelete(member);
+    setShowDeleteMemberModal(true);
+  };
+
+  const handleRemoveMember = async () => {
+    if (!memberToDelete) return;
+
+    setDeletingMember(true);
     try {
-      await apiClient.removeMember(vaultId, memberId);
+      await apiClient.removeMember(vaultId, memberToDelete.id);
       toast.success("Member removed");
       loadVaultData();
+      setShowDeleteMemberModal(false);
+      setMemberToDelete(null);
     } catch (error) {
       if (error instanceof SessionExpiredError) {
+        setShowDeleteMemberModal(false);
+        setMemberToDelete(null);
         return;
       }
       const errorMessage =
         error instanceof Error ? error.message : "Failed to remove member";
       toast.error(errorMessage);
+    } finally {
+      setDeletingMember(false);
     }
   };
 
@@ -875,8 +894,12 @@ export default function VaultDetailPage() {
                       title="Manually release vault"
                     >
                       <Unlock className="w-4 h-4" />
-                      <span className="hidden sm:inline text-xs font-bold">Release Vault</span>
-                      <span className="sm:hidden text-xs font-bold">Release</span>
+                      <span className="hidden sm:inline text-xs font-bold">
+                        Release Vault
+                      </span>
+                      <span className="sm:hidden text-xs font-bold">
+                        Release
+                      </span>
                     </button>
                   )}
               </div>
@@ -1207,7 +1230,7 @@ export default function VaultDetailPage() {
                                     member.userId !== vault.ownerId)) && (
                                   <button
                                     onClick={() =>
-                                      handleRemoveMember(member.id)
+                                      handleRemoveMemberClick(member)
                                     }
                                     className="px-2 sm:px-3 py-1.5 bg-red-500/20 text-red-400 rounded text-xs sm:text-sm hover:bg-red-500/30 transition-colors cursor-pointer whitespace-nowrap"
                                   >
@@ -2164,6 +2187,19 @@ export default function VaultDetailPage() {
         vaultName={vault?.name || ""}
         itemCount={items.length}
         loading={deletingVault}
+      />
+
+      {/* Delete Member Modal */}
+      <DeleteMemberModal
+        isOpen={showDeleteMemberModal}
+        onClose={() => {
+          setShowDeleteMemberModal(false);
+          setMemberToDelete(null);
+        }}
+        onConfirm={handleRemoveMember}
+        memberName={memberToDelete?.userName || ""}
+        memberEmail={memberToDelete?.userEmail || ""}
+        loading={deletingMember}
       />
     </div>
   );

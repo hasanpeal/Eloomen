@@ -1,7 +1,7 @@
 # Eloomen
+
 <div align="center">
 <img src="./client/public/icon.png" alt="Eloomen Logo" width="120" height="120" />
-
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.1-black?logo=next.js)](https://nextjs.org/)
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
@@ -608,11 +608,36 @@ Eloomen/
 
 ### Running Locally
 
+#### Quick Start (Recommended)
+
+Run both server and client simultaneously with live reload:
+
+```bash
+./start.sh
+```
+
+Or using npm:
+
+```bash
+npm run dev
+```
+
+This will start:
+
+- **Backend (.NET)**: `http://localhost:3000` with hot reload via `dotnet watch`
+- **Frontend (Next.js)**: `http://localhost:3001` with hot reload via Next.js dev server
+
+Both servers automatically reload when you make changes to the code. Press `Ctrl+C` to stop both servers.
+
+#### Manual Start (Alternative)
+
+If you prefer to run them separately:
+
 ```bash
 # Backend
 cd server
 dotnet restore
-dotnet run
+dotnet watch run
 
 # Frontend (new terminal)
 cd client
