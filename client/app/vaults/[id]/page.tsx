@@ -2197,8 +2197,8 @@ export default function VaultDetailPage() {
           setMemberToDelete(null);
         }}
         onConfirm={handleRemoveMember}
-        memberName={memberToDelete?.username || ""}
-        memberEmail={memberToDelete?.email || ""}
+        memberName={memberToDelete?.userName || ""}
+        memberEmail={memberToDelete?.userEmail || ""}
         loading={deletingMember}
       />
     </div>
