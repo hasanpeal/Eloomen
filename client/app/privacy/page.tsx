@@ -260,7 +260,7 @@ export default function PrivacyPage() {
                     <ul className="list-disc list-inside space-y-1 ml-4">
                       <li>
                         <strong>Password Hashing:</strong> User passwords are
-                        hashed using ASP.NET Core Identity's PBKDF2 algorithm
+                        hashed using ASP.NET Core Identity&apos;s PBKDF2 algorithm
                         with salt, making them impossible to recover even if our
                         database is compromised
                       </li>
@@ -425,7 +425,7 @@ export default function PrivacyPage() {
                   </li>
                   <li>
                     <strong>Account:</strong> All your data is deleted, except
-                    items in vaults you don't own (ownership transferred to
+                    items in vaults you don&apos;t own (ownership transferred to
                     vault owner)
                   </li>
                   <li>
@@ -467,7 +467,7 @@ export default function PrivacyPage() {
             {/* Children's Privacy */}
             <section>
               <h2 className="text-2xl font-bold text-slate-100 mb-4">
-                9. Children's Privacy
+                9. Children&apos;s Privacy
               </h2>
               <div className="text-slate-300 space-y-3 text-sm sm:text-base leading-relaxed">
                 <p>
@@ -487,7 +487,7 @@ export default function PrivacyPage() {
               <div className="text-slate-300 space-y-3 text-sm sm:text-base leading-relaxed">
                 <p>
                   We may update this Privacy Policy from time to time. We will
-                  notify you of material changes by updating the "Last updated"
+                  notify you of material changes by updating the &quot;Last updated&quot;
                   date. Your continued use of the Service after changes
                   constitutes acceptance of the updated policy.
                 </p>

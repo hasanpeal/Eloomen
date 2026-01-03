@@ -65,7 +65,7 @@ export default function AboutPage() {
               <p className="text-slate-300 leading-relaxed text-lg">
                 Eloomen was built to solve a critical real-world problem: how to securely
                 share sensitive information with specific people, either immediately or at
-                a future time. Whether you're planning your digital estate, sharing important
+                a future time. Whether you&apos;re planning your digital estate, sharing important
                 documents with family, or managing access to critical information, Eloomen
                 gives you complete control over who sees what and when.
               </p>

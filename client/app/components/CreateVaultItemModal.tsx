@@ -10,6 +10,7 @@ import {
   ItemPermission,
   ItemVisibilityRequest,
   SessionExpiredError,
+  WalletType,
 } from "../lib/api";
 import toast from "react-hot-toast";
 
@@ -162,7 +163,7 @@ export default function CreateVaultItemModal({
         setVisibilities(defaultVisibilities);
       }
     }
-  }, [isOpen, editingItem, members]);
+  }, [isOpen, editingItem, members, currentUserEmail]);
 
   if (!isOpen) return null;
 
@@ -197,7 +198,7 @@ export default function CreateVaultItemModal({
           noteContent: noteContent || undefined,
           url: url || undefined,
           linkNotes: linkNotes || undefined,
-          walletType: walletType as any,
+          walletType: walletType as WalletType,
           platformName: platformName || undefined,
           blockchain: blockchain || undefined,
           publicAddress: publicAddress || undefined,
@@ -238,7 +239,7 @@ export default function CreateVaultItemModal({
         noteContent: noteContent || undefined,
         url: url || undefined,
         linkNotes: linkNotes || undefined,
-        walletType: walletType as any,
+        walletType: walletType as WalletType,
         platformName: platformName || undefined,
         blockchain: blockchain || undefined,
         publicAddress: publicAddress || undefined,
@@ -252,12 +253,12 @@ export default function CreateVaultItemModal({
 
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Don't show toast for session expiration - it's already handled in API client
       if (error instanceof SessionExpiredError) {
         return;
       }
-      toast.error(error.message || "Failed to save item");
+      toast.error(error instanceof Error ? error.message : "Failed to save item");
     } finally {
       setLoading(false);
     }
@@ -449,7 +450,7 @@ export default function CreateVaultItemModal({
                 </label>
                 <select
                   value={walletType}
-                  onChange={(e) => setWalletType(e.target.value as any)}
+                  onChange={(e) => setWalletType(e.target.value as WalletType)}
                   className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer"
                 >
                   <option value="SeedPhrase">Seed Phrase</option>

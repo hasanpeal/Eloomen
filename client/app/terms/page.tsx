@@ -58,9 +58,9 @@ export default function TermsPage() {
               </h2>
               <div className="text-slate-300 space-y-3 text-sm sm:text-base leading-relaxed">
                 <p>
-                  Welcome to Eloomen. These Terms of Service ("Terms") govern
-                  your access to and use of Eloomen's digital vault platform
-                  ("Service"). By creating an account or using our Service, you
+                  Welcome to Eloomen. These Terms of Service (&quot;Terms&quot;) govern
+                  your access to and use of Eloomen&apos;s digital vault platform
+                  (&quot;Service&quot;). By creating an account or using our Service, you
                   agree to be bound by these Terms.
                 </p>
                 <p>
@@ -166,7 +166,7 @@ export default function TermsPage() {
                     </p>
                     <ul className="list-disc list-inside space-y-1 ml-4">
                       <li>
-                        User passwords are hashed using ASP.NET Core Identity's
+                        User passwords are hashed using ASP.NET Core Identity&apos;s
                         secure password hashing (PBKDF2)
                       </li>
                       <li>
@@ -262,7 +262,7 @@ export default function TermsPage() {
                 <ul className="list-disc list-inside space-y-2 ml-4">
                   <li>Use the Service for any illegal or unauthorized purpose</li>
                   <li>
-                    Attempt to gain unauthorized access to other users' vaults or
+                    Attempt to gain unauthorized access to other users&apos; vaults or
                     data
                   </li>
                   <li>
@@ -320,8 +320,8 @@ export default function TermsPage() {
               <div className="text-slate-300 space-y-3 text-sm sm:text-base leading-relaxed">
                 <p>
                   <strong className="text-slate-200">Side Project Notice:</strong>{" "}
-                  Eloomen is provided as a side project "as is" and "as
-                  available" without warranties of any kind, either express or
+                  Eloomen is provided as a side project &quot;as is&quot; and &quot;as
+                  available&quot; without warranties of any kind, either express or
                   implied. While we implement industry-standard security
                   measures, we cannot guarantee:
                 </p>
@@ -368,7 +368,7 @@ export default function TermsPage() {
               <div className="text-slate-300 space-y-3 text-sm sm:text-base leading-relaxed">
                 <p>
                   We reserve the right to modify these Terms at any time. We will
-                  notify users of material changes by updating the "Last updated"
+                  notify users of material changes by updating the &quot;Last updated&quot;
                   date at the top of this page. Your continued use of the Service
                   after changes constitutes acceptance of the new Terms.
                 </p>

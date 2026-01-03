@@ -13,7 +13,6 @@ import {
 import toast from "react-hot-toast";
 import {
   User,
-  Mail,
   Smartphone,
   Activity,
   Trash2,
@@ -35,7 +34,7 @@ export default function AccountPage() {
   const [activeTab, setActiveTab] = useState<Tab>("profile");
   const [devices, setDevices] = useState<UserDevice[]>([]);
   const [logs, setLogs] = useState<AccountLog[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading] = useState(true);
   const [devicesLoading, setDevicesLoading] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
   const [editingField, setEditingField] = useState<"username" | "email" | null>(
@@ -72,7 +71,6 @@ export default function AccountPage() {
         username: user.username || "",
         email: user.email || "",
       });
-      loadInitialData();
     }
   }, [isAuthenticated, user]);
 
@@ -83,21 +81,8 @@ export default function AccountPage() {
     if (activeTab === "logs" && logs.length === 0) {
       loadLogs();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
-
-  const loadInitialData = async () => {
-    try {
-      setLoading(true);
-      await Promise.all([loadDevices(), loadLogs()]);
-    } catch (error) {
-      if (error instanceof SessionExpiredError) {
-        return;
-      }
-      toast.error("Failed to load account");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadDevices = async () => {
     try {
@@ -139,9 +124,7 @@ export default function AccountPage() {
       }
 
       await apiClient.updateProfile(updateData);
-      toast.success(
-        `${field === "username" ? "Username" : "Email"} updated`
-      );
+      toast.success(`${field === "username" ? "Username" : "Email"} updated`);
       setEditingField(null);
 
       // Refresh user data

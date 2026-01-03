@@ -1,0 +1,76 @@
+name: Test with Coverage
+
+on:
+  # Disabled - using ci.yml instead. Enable this if you want coverage on every push
+  # push:
+  #   branches: [main, develop, master]
+  # pull_request:
+  #   branches: [main, develop, master]
+  workflow_dispatch: # Manual trigger for coverage reports
+
+jobs:
+  test-coverage:
+    name: Test with Code Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore server/server.sln
+        working-directory: .
+
+      - name: Build solution
+        run: dotnet build server/server.sln --no-restore --configuration Release
+        working-directory: .
+
+      - name: Install ReportGenerator
+        run: dotnet tool install -g dotnet-reportgenerator-globaltool
+
+      - name: Run tests with coverage
+        run: |
+          dotnet test server/Tests/server.Tests.csproj \
+            --no-build \
+            --configuration Release \
+            --verbosity normal \
+            --collect:"XPlat Code Coverage" \
+            --results-directory:./coverage
+        working-directory: .
+
+      - name: Generate coverage report
+        run: |
+          reportgenerator \
+            -reports:"./coverage/**/coverage.cobertura.xml" \
+            -targetdir:"./coverage-report" \
+            -reporttypes:"Html;Badges;JsonSummary"
+        working-directory: .
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./coverage/**/coverage.cobertura.xml
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: false
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage-report/
+          retention-days: 30
+
+      - name: Comment PR with coverage
+        uses: py-cov-action/python-coverage-comment-action@v3
+        if: github.event_name == 'pull_request'
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERAGE_FILES: coverage-report/Summary.json

@@ -1,0 +1,55 @@
+name: Run Tests
+
+on:
+  # Disabled - using ci.yml instead
+  # push:
+  #   branches: [main, develop, master]
+  # pull_request:
+  #   branches: [main, develop, master]
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  test:
+    name: Run Backend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore server/server.csproj
+        working-directory: .
+
+      - name: Restore test dependencies
+        run: dotnet restore server/Tests/server.Tests.csproj
+        working-directory: .
+
+      - name: Build solution
+        run: dotnet build server/server.sln --no-restore --configuration Release
+        working-directory: .
+
+      - name: Run tests
+        run: dotnet test server/Tests/server.Tests.csproj --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage"
+        working-directory: .
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: server/Tests/TestResults/**/*
+          retention-days: 30
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: |
+            server/Tests/TestResults/**/*.trx
+          check_name: "Backend Test Results"

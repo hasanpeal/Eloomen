@@ -27,7 +27,10 @@ export default function NotificationsModal({
 
   useEffect(() => {
     if (isOpen) {
-      setSelectedNotifications(new Set());
+      // Use setTimeout to avoid calling setState synchronously in effect
+      setTimeout(() => {
+        setSelectedNotifications(new Set());
+      }, 0);
     }
   }, [isOpen]);
 
