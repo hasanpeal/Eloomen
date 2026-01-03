@@ -44,6 +44,13 @@ jobs:
         run: dotnet test server/Tests/server.Tests.csproj --no-restore --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
         working-directory: .
 
+      - name: Notify Vercel - Backend Tests
+        uses: vercel/repository-dispatch/actions/status@v1
+        if: always()
+        with:
+          name: "Vercel - eloomen-prod: backend-tests"
+          state: ${{ job.status }}
+
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -76,8 +83,22 @@ jobs:
         run: npm run lint
         working-directory: client
 
+      - name: Notify Vercel - Lint
+        uses: vercel/repository-dispatch/actions/status@v1
+        if: always()
+        with:
+          name: "Vercel - eloomen-prod: lint"
+          state: ${{ job.status }}
+
       - name: Build Next.js app
         run: npm run build
         working-directory: client
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api' }}
+
+      - name: Notify Vercel - Build
+        uses: vercel/repository-dispatch/actions/status@v1
+        if: always()
+        with:
+          name: "Vercel - eloomen-prod: build"
+          state: ${{ job.status }}
