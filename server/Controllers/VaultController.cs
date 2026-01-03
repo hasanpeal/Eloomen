@@ -98,7 +98,7 @@ public class VaultController : ControllerBase
         var result = await _vaultService.RestoreVaultAsync(id, userId);
         
         if (!result)
-            return BadRequest("Vault cannot be restored (not found, not deleted, or recovery window expired)");
+            return BadRequest("Vault cannot be restored");
 
         return Ok(new { message = "Vault restored successfully" });
     }
@@ -128,7 +128,7 @@ public class VaultController : ControllerBase
         {
             // Log the exception for debugging
             _logger.LogError(ex, "Error creating invite for vault {VaultId}: {Message}", id, ex.Message);
-            return StatusCode(500, new { message = "Failed to create invite. Please try again." });
+            return StatusCode(500, new { message = "Failed to create invite" });
         }
     }
 
@@ -160,7 +160,7 @@ public class VaultController : ControllerBase
         var result = await _vaultService.CancelInviteAsync(inviteId, userId);
         
         if (!result)
-            return BadRequest("Invite cannot be cancelled");
+            return BadRequest("Cannot cancel invite");
 
         return Ok(new { message = "Invite cancelled successfully" });
     }
@@ -172,7 +172,7 @@ public class VaultController : ControllerBase
         var result = await _vaultService.ResendInviteAsync(inviteId, userId);
         
         if (!result)
-            return BadRequest("Invite cannot be resent");
+            return BadRequest("Cannot resend invite");
 
         return Ok(new { message = "Invite resent successfully" });
     }
@@ -206,7 +206,7 @@ public class VaultController : ControllerBase
         var result = await _vaultService.AcceptInviteAsync(dto.Token, dto.Email, userId);
         
         if (!result)
-            return BadRequest("Invalid or expired invite token, or email mismatch");
+            return BadRequest("Invalid invite");
 
         return Ok(new { message = "Invite accepted successfully" });
     }
@@ -227,7 +227,7 @@ public class VaultController : ControllerBase
         var result = await _vaultService.RemoveMemberAsync(id, memberId, userId);
         
         if (!result)
-            return BadRequest("Member cannot be removed (not found or insufficient permissions)");
+            return BadRequest("Cannot remove member");
 
         return NoContent();
     }
@@ -242,7 +242,7 @@ public class VaultController : ControllerBase
         var result = await _vaultService.UpdateMemberPrivilegeAsync(id, dto, userId);
         
         if (!result)
-            return BadRequest("Privilege cannot be updated (not found or insufficient permissions)");
+            return BadRequest("Cannot update privilege");
 
         return Ok(new { message = "Member privilege updated successfully" });
     }
@@ -257,7 +257,7 @@ public class VaultController : ControllerBase
         var result = await _vaultService.TransferOwnershipAsync(id, dto, userId);
         
         if (!result)
-            return BadRequest("Ownership cannot be transferred (member not found or not an Admin)");
+            return BadRequest("Cannot transfer ownership");
 
         return Ok(new { message = "Ownership transferred successfully" });
     }
@@ -269,7 +269,7 @@ public class VaultController : ControllerBase
         var result = await _vaultService.LeaveVaultAsync(id, userId);
         
         if (!result)
-            return BadRequest("Cannot leave vault (not a member or owner must transfer ownership first)");
+            return BadRequest("Cannot leave vault");
 
         return Ok(new { message = "Left vault successfully" });
     }
@@ -282,7 +282,7 @@ public class VaultController : ControllerBase
         var result = await _vaultService.ReleaseVaultManuallyAsync(id, userId);
         
         if (!result)
-            return BadRequest("Cannot release vault (insufficient permissions or policy type doesn't support manual release)");
+            return BadRequest("Cannot release vault");
 
         return Ok(new { message = "Vault released successfully" });
     }
@@ -304,7 +304,7 @@ public class VaultController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting vault logs for vault {VaultId}: {Message}", id, ex.Message);
-            return StatusCode(500, new { message = "Failed to retrieve vault logs. Please try again." });
+            return StatusCode(500, new { message = "Failed to retrieve vault logs" });
         }
     }
 }

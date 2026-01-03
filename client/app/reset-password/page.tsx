@@ -57,7 +57,7 @@ function ResetPasswordContent() {
 
       if (response.message) {
         setSuccess(true);
-        toast.success("Password reset successfully. Log in to continue.");
+        toast.success("Password reset");
         router.push("/login");
       }
     } catch (error) {

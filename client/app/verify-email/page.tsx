@@ -41,7 +41,7 @@ function VerifyEmailContent() {
 
       if (response.message) {
         setSuccess(true);
-        toast.success("Email verified successfully. Log in to continue.");
+        toast.success("Email verified");
         router.push("/login");
       }
     } catch (error) {

@@ -59,7 +59,7 @@ function VerifyDeviceContent() {
           sessionStorage.removeItem("pendingInviteToken");
         }
         
-        toast.success("Device verified successfully.");
+        toast.success("Device verified");
         
         // Redirect based on whether invite was accepted
         if (response.inviteAccepted) {

@@ -47,7 +47,7 @@ export default function ContactModal({ isOpen, onClose, isPublic = false }: Cont
       // Basic email validation
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email.trim())) {
-        toast.error("Please enter a valid email address");
+        toast.error("Email required");
         return;
       }
     } else {

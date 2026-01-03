@@ -98,7 +98,7 @@ class ApiClient {
             // Only show toast once
             if (!this.sessionExpiredToastShown) {
               this.sessionExpiredToastShown = true;
-              toast.error("Session expired. Please log in again.");
+              toast.error("Session expired");
               // Reset flag after a delay to allow for future session expirations
               setTimeout(() => {
                 this.sessionExpiredToastShown = false;
@@ -118,7 +118,7 @@ class ApiClient {
             // Only show toast once
             if (!this.sessionExpiredToastShown) {
               this.sessionExpiredToastShown = true;
-              toast.error("Session expired. Please log in again.");
+              toast.error("Session expired");
               // Reset flag after a delay to allow for future session expirations
               setTimeout(() => {
                 this.sessionExpiredToastShown = false;
@@ -436,7 +436,7 @@ class ApiClient {
         method: "POST",
       });
     } catch {
-      toast.error("Failed to logout. Please try again.");
+      toast.error("Logout failed");
     } finally {
       this.removeToken();
       // Reset session expired flag on logout
