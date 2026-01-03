@@ -84,7 +84,7 @@ export default function DashboardPage() {
     e.preventDefault();
     try {
       await apiClient.createVault(createForm);
-      toast.success("Vault created successfully!");
+      toast.success("Vault created");
       setShowCreateModal(false);
       setCreateForm({
         name: "",

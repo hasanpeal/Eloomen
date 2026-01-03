@@ -93,7 +93,7 @@ export default function AccountPage() {
       if (error instanceof SessionExpiredError) {
         return;
       }
-      toast.error("Failed to load account data");
+      toast.error("Failed to load account");
     } finally {
       setLoading(false);
     }
@@ -140,7 +140,7 @@ export default function AccountPage() {
 
       await apiClient.updateProfile(updateData);
       toast.success(
-        `${field === "username" ? "Username" : "Email"} updated successfully`
+        `${field === "username" ? "Username" : "Email"} updated`
       );
       setEditingField(null);
 
@@ -168,12 +168,12 @@ export default function AccountPage() {
     e.preventDefault();
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast.error("New passwords do not match");
+      toast.error("Passwords do not match");
       return;
     }
 
     if (passwordForm.newPassword.length < 8) {
-      toast.error("Password must be at least 8 characters long");
+      toast.error("Password must be 8+ characters");
       return;
     }
 
@@ -182,7 +182,7 @@ export default function AccountPage() {
         passwordForm.currentPassword,
         passwordForm.newPassword
       );
-      toast.success("Password changed successfully");
+      toast.success("Password changed");
       setShowChangePassword(false);
       setPasswordForm({
         currentPassword: "",
@@ -209,7 +209,7 @@ export default function AccountPage() {
 
     try {
       await apiClient.revokeDevice(deviceToRevoke.id);
-      toast.success("Device access revoked successfully");
+      toast.success("Device revoked");
       setShowRevokeModal(false);
       setDeviceToRevoke(null);
       loadDevices();
@@ -217,19 +217,19 @@ export default function AccountPage() {
       if (error instanceof SessionExpiredError) {
         return;
       }
-      toast.error("Failed to revoke device access");
+      toast.error("Failed to revoke device");
     }
   };
 
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== "DELETE") {
-      toast.error('Please type "DELETE" to confirm');
+      toast.error('Type "DELETE" to confirm');
       return;
     }
 
     try {
       await apiClient.deleteAccount();
-      toast.success("Account deleted successfully");
+      toast.success("Account deleted");
       await logout();
       router.push("/login");
     } catch (error) {

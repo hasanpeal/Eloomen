@@ -51,7 +51,7 @@ export default function NotificationsModal({
         apiClient.markNotificationAsRead(id)
       );
       await Promise.all(promises);
-      toast.success(`${selectedNotifications.size} notification(s) marked as read`);
+      toast.success(`${selectedNotifications.size} marked as read`);
       setSelectedNotifications(new Set());
       onNotificationsUpdate();
     } catch (error) {
@@ -70,7 +70,7 @@ export default function NotificationsModal({
         apiClient.deleteNotification(id)
       );
       await Promise.all(promises);
-      toast.success(`${selectedNotifications.size} notification(s) deleted`);
+      toast.success(`${selectedNotifications.size} deleted`);
       setSelectedNotifications(new Set());
       onNotificationsUpdate();
     } catch (error) {
@@ -90,7 +90,7 @@ export default function NotificationsModal({
         apiClient.markNotificationAsRead(n.id)
       );
       await Promise.all(promises);
-      toast.success("All notifications marked as read");
+      toast.success("All marked as read");
       onNotificationsUpdate();
     } catch (error) {
       if (error instanceof SessionExpiredError) {
@@ -103,7 +103,7 @@ export default function NotificationsModal({
   const handleDeleteAllRead = async () => {
     try {
       await apiClient.deleteAllReadNotifications();
-      toast.success("All read notifications deleted");
+      toast.success("Read notifications deleted");
       onNotificationsUpdate();
     } catch (error) {
       if (error instanceof SessionExpiredError) {

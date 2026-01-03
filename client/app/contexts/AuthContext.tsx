@@ -107,13 +107,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return {
         success: false,
-        message: "Login failed. Please try again.",
+        message: "Login failed",
       };
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "Login failed. Please try again.";
+          : "Login failed";
       return {
         success: false,
         message: errorMessage,

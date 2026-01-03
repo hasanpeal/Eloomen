@@ -41,14 +41,14 @@ function VerifyEmailContent() {
 
       if (response.message) {
         setSuccess(true);
-        toast.success("Email verified successfully. Log in to continue.");
+        toast.success("Email verified");
         router.push("/login");
       }
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "Verification failed. Please try again.";
+          : "Verification failed";
       setError(errorMessage);
     } finally {
       setIsLoading(false);

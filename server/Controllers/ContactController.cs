@@ -51,11 +51,11 @@ public class ContactController : ControllerBase
                 dto.Message
             );
 
-            return Ok(new { message = "Contact message sent successfully" });
+            return Ok(new { message = "Message sent" });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Failed to send contact message. Please try again later." });
+            return StatusCode(500, new { message = "Failed to send message" });
         }
     }
 
@@ -76,11 +76,11 @@ public class ContactController : ControllerBase
                 dto.Message
             );
 
-            return Ok(new { message = "Contact message sent successfully" });
+            return Ok(new { message = "Message sent" });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Failed to send contact message. Please try again later." });
+            return StatusCode(500, new { message = "Failed to send message" });
         }
     }
 }

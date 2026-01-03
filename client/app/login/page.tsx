@@ -107,13 +107,13 @@ function LoginContent() {
           setError(result.message || "Verification required");
         }
       } else {
-        setError(result.message || "Login failed. Please try again.");
+        setError(result.message || "Login failed");
       }
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "An error occurred. Please try again.";
+          : "An error occurred";
       setError(errorMessage);
     } finally {
       setIsLoading(false);
