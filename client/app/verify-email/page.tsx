@@ -48,7 +48,7 @@ function VerifyEmailContent() {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "Verification failed. Please try again.";
+          : "Verification failed";
       setError(errorMessage);
     } finally {
       setIsLoading(false);

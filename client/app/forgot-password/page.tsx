@@ -40,7 +40,7 @@ function ForgotPasswordContent() {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "Failed to send reset code. Please try again.";
+          : "Failed to send reset code";
       setError(errorMessage);
     } finally {
       setIsLoading(false);

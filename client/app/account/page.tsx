@@ -223,7 +223,7 @@ export default function AccountPage() {
 
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== "DELETE") {
-      toast.error('Please type "DELETE" to confirm');
+      toast.error('Type "DELETE" to confirm');
       return;
     }
 

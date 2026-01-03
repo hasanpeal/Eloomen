@@ -137,7 +137,7 @@ class ApiClient {
 
         // Try to parse as JSON first
         const contentType = response.headers.get("content-type");
-        let errorMessage = "An error occurred. Please try again.";
+        let errorMessage = "An error occurred";
 
         if (contentType && contentType.includes("application/json")) {
           try {
@@ -163,10 +163,10 @@ class ApiClient {
                 } else if (typeof firstError === "string") {
                   errorMessage = firstError;
                 } else {
-                  errorMessage = "Validation failed. Please check your input.";
+                  errorMessage = "Invalid input";
                 }
               } else {
-                errorMessage = "An error occurred. Please try again.";
+                errorMessage = "An error occurred";
               }
             }
           } catch {
@@ -185,17 +185,17 @@ class ApiClient {
         }
 
         // Fallback to user-friendly messages based on status code if no message was found
-        if (errorMessage === "An error occurred. Please try again.") {
+        if (errorMessage === "An error occurred") {
           if (response.status === 404) {
             errorMessage = "Resource not found.";
           } else if (response.status === 500) {
-            errorMessage = "Server error. Please try again later.";
+            errorMessage = "Server error";
           } else if (response.status === 401) {
-            errorMessage = "Unauthorized. Please check your credentials.";
+            errorMessage = "Unauthorized";
           } else if (response.status === 403) {
             errorMessage = "You don't have permission to access this resource.";
           } else if (response.status === 400) {
-            errorMessage = "Invalid request. Please check your input.";
+            errorMessage = "Invalid request";
           }
         }
 
@@ -246,7 +246,7 @@ class ApiClient {
       // Handle network errors
       if (error instanceof TypeError && error.message.includes("fetch")) {
         throw new Error(
-          "Unable to connect to the server. Please check if the backend is running."
+          "Unable to connect to server"
         );
       }
       throw error;
@@ -995,16 +995,16 @@ class ApiClient {
     if (response.status === 404) {
       return "Resource not found.";
     } else if (response.status === 500) {
-      return "Server error. Please try again later.";
+      return "Server error";
     } else if (response.status === 401) {
-      return "Unauthorized. Please check your credentials.";
+      return "Unauthorized";
     } else if (response.status === 403) {
       return "You don't have permission to access this resource.";
     } else if (response.status === 400) {
-      return "Invalid request. Please check your input.";
+      return "Invalid request";
     }
 
-    return "An error occurred. Please try again.";
+    return "An error occurred";
   }
 }
 

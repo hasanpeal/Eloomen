@@ -64,7 +64,7 @@ function ResetPasswordContent() {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "Failed to reset password. Please try again.";
+          : "Failed to reset password";
       setError(errorMessage);
     } finally {
       setIsLoading(false);
