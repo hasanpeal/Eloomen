@@ -200,7 +200,7 @@ export default function NotificationsModal({
           {loading ? (
             <div className="text-center py-12">
               <div className="animate-spin h-8 w-8 text-indigo-400 mx-auto"></div>
-              <p className="text-slate-400 mt-4">Loading notifications...</p>
+              <p className="text-slate-400 mt-4">Loading notifications</p>
             </div>
           ) : notifications.length === 0 ? (
             <div className="text-center py-12">

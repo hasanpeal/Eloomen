@@ -118,7 +118,7 @@ export default function ViewItemModal({
           </div>
           {loading && (
             <div className="text-sm text-slate-400 mb-4">
-              Loading item details...
+              Loading item details
             </div>
           )}
           <button

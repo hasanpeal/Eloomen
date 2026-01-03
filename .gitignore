@@ -20,3 +20,7 @@ obj/
 appsettings.Development.json
 appsettings.Production.json
 appsettings.Staging.json
+
+# Docker
+docker-compose.override.yml
+.docker/

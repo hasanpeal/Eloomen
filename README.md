@@ -793,6 +793,192 @@ npm run dev
 
 ---
 
+## 🐳 Docker Setup
+
+The project includes a complete Docker setup with hot reload for both frontend and backend, making it easy to run the entire application with a single command.
+
+### Prerequisites
+
+- **Docker** and **Docker Compose** installed
+- **`.env` file** created in the root directory (see setup below)
+
+### Quick Start
+
+1. **Create a `.env` file** in the root directory of the project.
+
+   **Option A: Copy from `appsettings.development.json`**
+
+   If you already have `server/appsettings.development.json` configured, you can create the `.env` file by converting the JSON structure to environment variables. Use double underscores (`__`) for nested configuration keys.
+
+   **Option B: Create manually**
+
+   The `.env` file should contain all environment variables matching the structure of `server/appsettings.development.json`. Use double underscores (`__`) for nested configuration keys.
+
+   **Example `.env` file:**
+
+   ```bash
+   # Database Connection String
+   ConnectionStrings__Default=User Id=postgres.xxx;Password=xxx;Server=xxx;Port=5432;Database=postgres
+
+   # JWT Configuration
+   Jwt__Issuer=http://localhost:3000
+   Jwt__Audience=http://localhost:3001
+   Jwt__SigningKey=your-secret-signing-key-here
+   Jwt__AccessTokenMinutes=15
+   Jwt__RefreshTokenDays=30
+
+   # SendGrid Configuration
+   SendGrid__ApiKey=SG.xxx
+   SendGrid__FromEmail=support@eloomen.com
+   SendGrid__FromName=Eloomen
+   SendGrid__AdminEmail=your-admin-email@example.com
+
+   # App Configuration
+   App__BaseUrl=http://localhost:3001
+   App__EmailVerificationPath=/verify-email
+   App__DeviceVerificationPath=/verify-device
+   App__PasswordResetPath=/reset-password
+   App__VerificationCodeExpiration__EmailVerificationMinutes=1440
+   App__VerificationCodeExpiration__DeviceVerificationMinutes=60
+   App__VerificationCodeExpiration__PasswordResetMinutes=60
+
+   # S3 / Cloudflare R2 Configuration
+   S3__BucketName=eloomen-dev
+   S3__BaseUrl=https://xxx.r2.cloudflarestorage.com
+   S3__Endpoint=https://xxx.r2.cloudflarestorage.com
+   S3__AccessKeyId=xxx
+   S3__SecretAccessKey=xxx
+
+   # Frontend Configuration
+   NEXT_PUBLIC_API_URL=http://localhost:3000/api
+   ```
+
+   **Important Notes:**
+
+   - The `.env` file is already in `.gitignore` and will not be committed to the repository
+   - Variable names use `__` (double underscore) for nested configuration (e.g., `ConnectionStrings__Default`, `Jwt__Issuer`)
+   - Copy values from `server/appsettings.development.json` and convert the JSON structure to environment variable format
+   - For nested objects, use `__` to separate levels (e.g., `App__VerificationCodeExpiration__EmailVerificationMinutes`)
+
+2. **Start all services** with Docker Compose:
+
+   ```bash
+   docker-compose up
+   ```
+
+   This will:
+
+   - Build and start both frontend and backend services
+   - Enable hot reload for both services (changes are reflected immediately)
+   - Expose frontend on http://localhost:3001
+   - Expose backend on http://localhost:3000
+   - Automatically run database migrations on backend startup
+   - Load all environment variables from the `.env` file
+
+### Services
+
+#### Backend (ASP.NET Core)
+
+- **Port**: 3000
+- **Hot Reload**: Enabled via `dotnet watch`
+- **Environment**: Development
+- **Database**: Automatically runs migrations on startup
+- **Swagger**: Available at http://localhost:3000/swagger
+
+#### Frontend (Next.js)
+
+- **Port**: 3001
+- **Hot Reload**: Enabled via Next.js dev mode
+- **API URL**: http://localhost:3000/api
+
+### Docker Commands
+
+```bash
+# Start services
+docker-compose up
+
+# Start in detached mode (background)
+docker-compose up -d
+
+# Stop services
+docker-compose down
+
+# Rebuild after dependency changes
+docker-compose build
+docker-compose up
+
+# View logs
+docker-compose logs -f
+
+# View logs for specific service
+docker-compose logs -f backend
+docker-compose logs -f frontend
+```
+
+### Hot Reload
+
+Both services support hot reload out of the box:
+
+- **Backend**: Changes to `.cs` files automatically trigger `dotnet watch` to rebuild and restart
+- **Frontend**: Changes to `.tsx`, `.ts`, and `.css` files are automatically reflected in the browser
+
+Source code is mounted as volumes, so you can edit files directly and see changes immediately.
+
+### Environment Variables
+
+All environment variables are loaded from the `.env` file in the root directory. The `docker-compose.yml` uses `env_file: - .env` to automatically load all variables into both services.
+
+**Key Points:**
+
+- The `.env` file must be created in the root directory (same level as `docker-compose.yml`)
+- Variable names must match the structure of `appsettings.development.json` using `__` for nesting
+- The `.env` file is already in `.gitignore` and will not be committed to the repository
+- Both backend and frontend services read from the same `.env` file
+- Environment variables override `appsettings.development.json` when set
+
+**Converting from `appsettings.development.json` to `.env`:**
+
+| JSON Structure                                            | Environment Variable                                        |
+| --------------------------------------------------------- | ----------------------------------------------------------- |
+| `ConnectionStrings.Default`                               | `ConnectionStrings__Default`                                |
+| `Jwt.Issuer`                                              | `Jwt__Issuer`                                               |
+| `App.VerificationCodeExpiration.EmailVerificationMinutes` | `App__VerificationCodeExpiration__EmailVerificationMinutes` |
+
+**Quick Reference:**
+
+- Replace dots (`.`) with double underscores (`__`)
+- Keep the same structure and nesting
+- All string values should be unquoted
+- Copy exact values from `appsettings.development.json`
+
+### Troubleshooting
+
+#### Services won't start
+
+- Ensure Docker and Docker Compose are installed and running
+- Check that all required environment variables are set in `.env`
+- Verify ports 3000 and 3001 are not already in use
+
+#### Hot reload not working
+
+- Ensure source code volumes are properly mounted (check `docker-compose.yml`)
+- Try rebuilding containers: `docker-compose build --no-cache`
+
+#### Database connection issues
+
+- Verify `ConnectionStrings__Default` in `.env` is correct
+- Check that your database is accessible from Docker containers
+- For local PostgreSQL, use `host.docker.internal` instead of `localhost`
+- Ensure the connection string format matches: `User Id=xxx;Password=xxx;Server=xxx;Port=5432;Database=postgres`
+
+#### Frontend can't connect to backend
+
+- Verify `NEXT_PUBLIC_API_URL` in `.env` matches backend URL
+- Check that both containers are on the same Docker network
+- Ensure backend is running and accessible on port 3000
+
+---
+
 ## 🔄 CI/CD Pipeline
 
 **GitHub Actions Workflow:**

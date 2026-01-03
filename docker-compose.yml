@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: eloomen-backend
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount source code for hot reload
+      - ./server:/app
+      # Exclude build outputs to avoid conflicts
+      - /app/bin
+      - /app/obj
+      - /app/node_modules
+    env_file:
+      - .env
+    networks:
+      - eloomen-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: eloomen-frontend
+    ports:
+      - "3001:3001"
+    volumes:
+      # Mount source code for hot reload
+      - ./client:/app
+      - /app/node_modules
+      - /app/.next
+    env_file:
+      - .env
+    networks:
+      - eloomen-network
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+networks:
+  eloomen-network:
+    driver: bridge
