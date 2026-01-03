@@ -2,7 +2,6 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using server.Dtos.Vault;
 using server.Interfaces;
 using server.Models;
@@ -16,13 +15,11 @@ public class VaultController : ControllerBase
 {
     private readonly IVaultService _vaultService;
     private readonly UserManager<User> _userManager;
-    private readonly ILogger<VaultController> _logger;
 
-    public VaultController(IVaultService vaultService, UserManager<User> userManager, ILogger<VaultController> logger)
+    public VaultController(IVaultService vaultService, UserManager<User> userManager)
     {
         _vaultService = vaultService;
         _userManager = userManager;
-        _logger = logger;
     }
 
     private string GetUserId()
@@ -126,8 +123,6 @@ public class VaultController : ControllerBase
         }
         catch (Exception ex)
         {
-            // Log the exception for debugging
-            _logger.LogError(ex, "Error creating invite for vault {VaultId}: {Message}", id, ex.Message);
             return StatusCode(500, new { message = "Failed to create invite" });
         }
     }
@@ -303,7 +298,6 @@ public class VaultController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting vault logs for vault {VaultId}: {Message}", id, ex.Message);
             return StatusCode(500, new { message = "Failed to retrieve vault logs" });
         }
     }

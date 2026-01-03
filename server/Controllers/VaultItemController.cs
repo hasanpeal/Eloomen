@@ -3,7 +3,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using server.Dtos.VaultItem;
 using server.Interfaces;
 
@@ -15,12 +14,10 @@ namespace server.Controllers;
 public class VaultItemController : ControllerBase
 {
     private readonly IVaultItemService _itemService;
-    private readonly ILogger<VaultItemController> _logger;
 
-    public VaultItemController(IVaultItemService itemService, ILogger<VaultItemController> logger)
+    public VaultItemController(IVaultItemService itemService)
     {
         _itemService = itemService;
-        _logger = logger;
     }
 
     private string GetUserId()
@@ -41,7 +38,6 @@ public class VaultItemController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting vault items for vault {VaultId}: {Message}", vaultId, ex.Message);
             return StatusCode(500, new { message = "Failed to retrieve items" });
         }
     }
@@ -61,7 +57,6 @@ public class VaultItemController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting item {ItemId} from vault {VaultId}: {Message}", itemId, vaultId, ex.Message);
             return StatusCode(500, new { message = "Failed to retrieve item" });
         }
     }
@@ -91,13 +86,9 @@ public class VaultItemController : ControllerBase
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed to deserialize visibilities JSON for vault {VaultId}: {Error}", vaultId, ex.Message);
+                        // Failed to deserialize visibilities JSON
                     }
                 }
-            }
-            else
-            {
-                _logger.LogWarning("No visibilities found in form data for vault {VaultId}", vaultId);
             }
 
             if (!ModelState.IsValid)
@@ -120,7 +111,6 @@ public class VaultItemController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating item in vault {VaultId}: {Message}", vaultId, ex.Message);
             return StatusCode(500, new { message = "Failed to create item" });
         }
     }
@@ -150,13 +140,9 @@ public class VaultItemController : ControllerBase
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed to deserialize visibilities JSON for update item {ItemId}: {Error}", itemId, ex.Message);
+                        // Failed to deserialize visibilities JSON
                     }
                 }
-            }
-            else
-            {
-                _logger.LogWarning("No visibilities found in form data for update item {ItemId} in vault {VaultId}", itemId, vaultId);
             }
 
             if (!ModelState.IsValid)
@@ -176,7 +162,6 @@ public class VaultItemController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating item {ItemId} in vault {VaultId}: {Message}", itemId, vaultId, ex.Message);
             return StatusCode(500, new { message = "Failed to update item" });
         }
     }
@@ -196,7 +181,6 @@ public class VaultItemController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting item {ItemId} from vault {VaultId}: {Message}", itemId, vaultId, ex.Message);
             return StatusCode(500, new { message = "Failed to delete item" });
         }
     }
@@ -216,7 +200,6 @@ public class VaultItemController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error restoring item {ItemId} in vault {VaultId}: {Message}", itemId, vaultId, ex.Message);
             return StatusCode(500, new { message = "Failed to restore item" });
         }
     }

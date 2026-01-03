@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using server.Dtos.Vault;
 using server.Interfaces;
 using server.Models;
@@ -15,7 +14,6 @@ public class VaultService : IVaultService
     private readonly UserManager<User> _userManager;
     private readonly IEmailService _emailService;
     private readonly IConfiguration _config;
-    private readonly ILogger<VaultService> _logger;
     private readonly IS3Service _s3Service;
     private readonly INotificationService _notificationService;
 
@@ -24,7 +22,6 @@ public class VaultService : IVaultService
         UserManager<User> userManager,
         IEmailService emailService,
         IConfiguration config,
-        ILogger<VaultService> logger,
         IS3Service s3Service,
         INotificationService notificationService)
     {
@@ -32,7 +29,6 @@ public class VaultService : IVaultService
         _userManager = userManager;
         _emailService = emailService;
         _config = config;
-        _logger = logger;
         _s3Service = s3Service;
         _notificationService = notificationService;
     }
@@ -413,13 +409,9 @@ public class VaultService : IVaultService
                 try
                 {
                     await _s3Service.DeleteFileAsync(item.Document.ObjectKey);
-                    _logger.LogInformation("Deleted document {ObjectKey} from S3 for vault {VaultId}", 
-                        item.Document.ObjectKey, vaultId);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to delete document {ObjectKey} from S3 for vault {VaultId}. Continuing with vault deletion.", 
-                        item.Document.ObjectKey, vaultId);
                     // Continue with deletion even if S3 deletion fails
                 }
             }
@@ -467,7 +459,6 @@ public class VaultService : IVaultService
         _dbContext.Vaults.Remove(vault);
         await _dbContext.SaveChangesAsync();
 
-        _logger.LogInformation("Vault {VaultId} deleted by user {UserId}", vaultId, userId);
         return true;
     }
 
@@ -569,8 +560,6 @@ public class VaultService : IVaultService
         }
         catch (Exception ex)
         {
-            // Log error but don't fail the invite creation
-            _logger.LogError(ex, "Failed to send invite email for invite {InviteId}, but invite was created", invite.Id);
             // Reload invite to get latest status
             await _dbContext.Entry(invite).ReloadAsync();
         }
@@ -964,21 +953,14 @@ public class VaultService : IVaultService
 
         if (anyExistingMember != null)
         {
-            _logger.LogInformation("Found existing member record {MemberId} for user {UserId} in vault {VaultId}. Current status: {Status}", 
-                anyExistingMember.Id, userId, invite.VaultId, anyExistingMember.Status);
-            
             if (anyExistingMember.Status == MemberStatus.Active)
             {
                 // Already active, just mark invite as accepted
-                _logger.LogInformation("Member {UserId} is already active in vault {VaultId}", userId, invite.VaultId);
                 memberRecord = anyExistingMember;
             }
             else
             {
                 // Reactivate the member
-                _logger.LogInformation("Reactivating member {UserId} for vault {VaultId}. Previous status: {Status}", 
-                    userId, invite.VaultId, anyExistingMember.Status);
-                
                 anyExistingMember.Status = MemberStatus.Active;
                 anyExistingMember.Privilege = invite.Privilege;
                 anyExistingMember.AddedById = invite.InviterId;
@@ -990,14 +972,10 @@ public class VaultService : IVaultService
                 // Use Update to ensure EF tracks all changes
                 _dbContext.VaultMembers.Update(anyExistingMember);
                 memberRecord = anyExistingMember;
-                
-                _logger.LogInformation("Member {UserId} reactivated for vault {VaultId}. New status: {Status}", 
-                    userId, invite.VaultId, anyExistingMember.Status);
             }
         }
         else
         {
-            _logger.LogInformation("No existing member record found. Creating new member record for {UserId} in vault {VaultId}", userId, invite.VaultId);
             
             // Create new member record
             var member = new VaultMember
@@ -1022,7 +1000,6 @@ public class VaultService : IVaultService
         try
         {
             await _dbContext.SaveChangesAsync();
-            _logger.LogInformation("Successfully saved member changes for {UserId} in vault {VaultId}", userId, invite.VaultId);
 
             // Log vault activity
             var vaultLog = new VaultLog
@@ -1103,8 +1080,6 @@ public class VaultService : IVaultService
                         }
                     }
                     await _dbContext.SaveChangesAsync();
-                    _logger.LogInformation("Created {Count} visibility records for new member {UserId} in vault {VaultId}", 
-                        existingItems.Count, userId, invite.VaultId);
                 }
             }
 
@@ -1112,7 +1087,6 @@ public class VaultService : IVaultService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to save member changes for {UserId} in vault {VaultId}", userId, invite.VaultId);
             throw;
         }
     }
@@ -1529,7 +1503,6 @@ public class VaultService : IVaultService
             
             if (vault == null || inviter == null)
             {
-                _logger.LogWarning("Cannot send invite email: Vault {VaultId} or inviter {InviterId} not found", invite.VaultId, invite.InviterId);
                 return;
             }
 
@@ -1544,8 +1517,6 @@ public class VaultService : IVaultService
                 _ => invite.Privilege.ToString()
             };
 
-            _logger.LogInformation("Attempting to send vault invite email to {Email} for vault {VaultId}", invite.InviteeEmail, invite.VaultId);
-
             await _emailService.SendVaultInviteAsync(
                 invite.InviteeEmail,
                 inviter.UserName ?? inviter.Email ?? "Someone",
@@ -1555,8 +1526,6 @@ public class VaultService : IVaultService
                 invite.Note
             );
             
-            _logger.LogInformation("Successfully sent vault invite email to {Email} for vault {VaultId}", invite.InviteeEmail, invite.VaultId);
-            
             // Update invite status to Sent (for tracking purposes)
             invite.Status = InviteStatus.Sent;
             
@@ -1564,30 +1533,23 @@ public class VaultService : IVaultService
             try
             {
                 await _dbContext.SaveChangesAsync();
-                _logger.LogInformation("Updated invite {InviteId} status to Sent", invite.Id);
             }
             catch (Exception saveEx)
             {
-                _logger.LogWarning(saveEx, "Failed to save invite status update for invite {InviteId}", invite.Id);
+                // Failed to save invite status update
             }
         }
         catch (Exception ex)
         {
-            // Log error but don't fail - invite is already created
-            // The invite can be resent later
-            _logger.LogError(ex, "Failed to send vault invite email to {Email} for vault {VaultId}. Error: {ErrorMessage}", 
-                invite.InviteeEmail, invite.VaultId, ex.Message);
-            
             // Try to update status to Pending if email fails
             try
             {
                 invite.Status = InviteStatus.Pending;
                 await _dbContext.SaveChangesAsync();
-                _logger.LogInformation("Updated invite {InviteId} status to Pending after email failure", invite.Id);
             }
             catch (Exception saveEx)
             {
-                _logger.LogWarning(saveEx, "Failed to update invite {InviteId} status to Pending", invite.Id);
+                // Failed to update invite status
             }
         }
     }

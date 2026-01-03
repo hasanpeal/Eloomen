@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using server.Dtos.VaultItem;
 using server.Interfaces;
 using server.Models;
@@ -16,7 +15,6 @@ public class VaultItemService : IVaultItemService
     private readonly IEncryptionService _encryptionService;
     private readonly IS3Service _s3Service;
     private readonly IConfiguration _configuration;
-    private readonly ILogger<VaultItemService> _logger;
     private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService;
 
@@ -27,7 +25,6 @@ public class VaultItemService : IVaultItemService
         IEncryptionService encryptionService,
         IS3Service s3Service,
         IConfiguration configuration,
-        ILogger<VaultItemService> logger,
         IEmailService emailService,
         INotificationService notificationService)
     {
@@ -37,7 +34,6 @@ public class VaultItemService : IVaultItemService
         _encryptionService = encryptionService;
         _s3Service = s3Service;
         _configuration = configuration;
-        _logger = logger;
         _emailService = emailService;
         _notificationService = notificationService;
     }
@@ -160,18 +156,13 @@ public class VaultItemService : IVaultItemService
         }
 
         // Set visibility permissions - ALWAYS create for all members
-        _logger.LogInformation("Setting visibilities for item {ItemId} in vault {VaultId}. Provided visibilities: {Count}", 
-            item.Id, dto.VaultId, dto.Visibilities?.Count ?? 0);
-        
         if (dto.Visibilities != null && dto.Visibilities.Any())
         {
-            _logger.LogInformation("Using provided visibilities for item {ItemId}", item.Id);
             // Ensure all members have visibility records
             await SetItemVisibilitiesAsync(item.Id, dto.Visibilities, dto.VaultId, userId);
         }
         else
         {
-            _logger.LogInformation("Using default visibilities for item {ItemId}", item.Id);
             // Default: make visible to all vault members (creator gets Edit, others get View)
             await SetDefaultVisibilitiesAsync(item.Id, dto.VaultId, userId);
         }
@@ -655,8 +646,6 @@ public class VaultItemService : IVaultItemService
 
     private async Task SetItemVisibilitiesAsync(int itemId, List<ItemVisibilityDTO> visibilities, int vaultId, string userId)
     {
-        _logger.LogInformation("SetItemVisibilitiesAsync called for item {ItemId} with {Count} visibility entries", itemId, visibilities?.Count ?? 0);
-        
         // Remove existing visibilities (shouldn't be any for new items, but safe to do)
         var existing = await _dbContext.VaultItemVisibilities
             .Where(v => v.VaultItemId == itemId)
@@ -680,8 +669,6 @@ public class VaultItemService : IVaultItemService
             .Where(m => m.VaultId == vaultId && m.Status == MemberStatus.Active)
             .ToListAsync();
 
-        _logger.LogInformation("Found {Count} active members for vault {VaultId}", allMembers.Count, vaultId);
-
         // Create a dictionary of provided visibilities for quick lookup
         // Handle duplicates by taking the last one (in case frontend sends duplicates)
         var visibilityDict = visibilities != null && visibilities.Any()
@@ -689,12 +676,8 @@ public class VaultItemService : IVaultItemService
                 .GroupBy(v => v.VaultMemberId)
                 .ToDictionary(g => g.Key, g => g.Last().Permission)
             : new Dictionary<int, ItemPermission>();
-        
-        _logger.LogInformation("Created visibility dictionary with {Count} unique member IDs from {Total} entries", 
-            visibilityDict.Count, visibilities?.Count ?? 0);
 
         // Add visibility records for all members
-        var recordsAdded = 0;
         foreach (var member in allMembers)
         {
             // Owner always gets Edit permission, regardless of what's provided
@@ -718,12 +701,9 @@ public class VaultItemService : IVaultItemService
                 Permission = permission
             };
             _dbContext.VaultItemVisibilities.Add(itemVisibility);
-            recordsAdded++;
-            // Don't log individual visibility records in production
         }
 
-        var saved = await _dbContext.SaveChangesAsync();
-        _logger.LogInformation("Saved {Count} visibility records to database for item {ItemId}", saved, itemId);
+        await _dbContext.SaveChangesAsync();
     }
 
     private async Task SetDefaultVisibilitiesAsync(int itemId, int vaultId, string userId)
