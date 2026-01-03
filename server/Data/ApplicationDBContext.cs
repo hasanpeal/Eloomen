@@ -1,10 +1,11 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace server.Models;
 
-public class ApplicationDBContext : IdentityDbContext<User>
+public class ApplicationDBContext : IdentityDbContext<User>, IDataProtectionKeyContext
 {
     public ApplicationDBContext(DbContextOptions<ApplicationDBContext> options)
         : base(options)
@@ -28,6 +29,9 @@ public class ApplicationDBContext : IdentityDbContext<User>
     public DbSet<AccountLog> AccountLogs { get; set; }
     public DbSet<VaultLog> VaultLogs { get; set; }
     public DbSet<Notification> Notifications { get; set; }
+    
+    // Data Protection Keys (for ASP.NET Core Data Protection)
+    public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
