@@ -34,7 +34,6 @@ export default function AccountPage() {
   const [activeTab, setActiveTab] = useState<Tab>("profile");
   const [devices, setDevices] = useState<UserDevice[]>([]);
   const [logs, setLogs] = useState<AccountLog[]>([]);
-  const [loading] = useState(true);
   const [devicesLoading, setDevicesLoading] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
   const [editingField, setEditingField] = useState<"username" | "email" | null>(
@@ -236,7 +235,7 @@ export default function AccountPage() {
       .replace(/^./, (str) => str.toUpperCase());
   };
 
-  if (isLoading || loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50 flex items-center justify-center">
         <div className="text-center">

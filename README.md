@@ -793,6 +793,145 @@ npm run dev
 
 ---
 
+## 🐳 Docker Setup
+
+The project includes a complete Docker setup with hot reload for both frontend and backend, making it easy to run the entire application with a single command.
+
+### Prerequisites
+
+- **Docker** and **Docker Compose** installed
+- All environment variables configured (see below)
+
+### Quick Start
+
+1. **Create a `.env` file** in the root directory with your environment variables:
+
+   ```bash
+   # Database
+   DB_CONNECTION_STRING=User Id=postgres.xxx;Password=xxx;Server=xxx;Port=5432;Database=postgres
+
+   # JWT
+   JWT_ISSUER=http://localhost:3000
+   JWT_AUDIENCE=http://localhost:3001
+   JWT_SIGNING_KEY=your-secret-signing-key-here
+   JWT_ACCESS_TOKEN_MINUTES=15
+   JWT_REFRESH_TOKEN_DAYS=30
+
+   # SendGrid
+   SENDGRID_API_KEY=SG.xxx
+   SENDGRID_FROM_EMAIL=support@eloomen.com
+   SENDGRID_FROM_NAME=Eloomen
+   SENDGRID_ADMIN_EMAIL=your-admin-email@example.com
+
+   # App URLs
+   APP_BASE_URL=http://localhost:3001
+   APP_EMAIL_VERIFICATION_PATH=/verify-email
+   APP_DEVICE_VERIFICATION_PATH=/verify-device
+   APP_PASSWORD_RESET_PATH=/reset-password
+   EMAIL_VERIFICATION_MINUTES=1440
+   DEVICE_VERIFICATION_MINUTES=60
+   PASSWORD_RESET_MINUTES=60
+
+   # S3 / Cloudflare R2
+   S3_BUCKET_NAME=eloomen-dev
+   S3_BASE_URL=https://xxx.r2.cloudflarestorage.com
+   S3_ENDPOINT=https://xxx.r2.cloudflarestorage.com
+   S3_ACCESS_KEY_ID=xxx
+   S3_SECRET_ACCESS_KEY=xxx
+
+   # Frontend
+   NEXT_PUBLIC_API_URL=http://localhost:3000/api
+   ```
+
+2. **Start all services** with Docker Compose:
+
+   ```bash
+   docker-compose up
+   ```
+
+   This will:
+   - Build and start both frontend and backend services
+   - Enable hot reload for both services (changes are reflected immediately)
+   - Expose frontend on http://localhost:3001
+   - Expose backend on http://localhost:3000
+   - Automatically run database migrations on backend startup
+
+### Services
+
+#### Backend (ASP.NET Core)
+- **Port**: 3000
+- **Hot Reload**: Enabled via `dotnet watch`
+- **Environment**: Development
+- **Database**: Automatically runs migrations on startup
+- **Swagger**: Available at http://localhost:3000/swagger
+
+#### Frontend (Next.js)
+- **Port**: 3001
+- **Hot Reload**: Enabled via Next.js dev mode
+- **API URL**: http://localhost:3000/api
+
+### Docker Commands
+
+```bash
+# Start services
+docker-compose up
+
+# Start in detached mode (background)
+docker-compose up -d
+
+# Stop services
+docker-compose down
+
+# Rebuild after dependency changes
+docker-compose build
+docker-compose up
+
+# View logs
+docker-compose logs -f
+
+# View logs for specific service
+docker-compose logs -f backend
+docker-compose logs -f frontend
+```
+
+### Hot Reload
+
+Both services support hot reload out of the box:
+
+- **Backend**: Changes to `.cs` files automatically trigger `dotnet watch` to rebuild and restart
+- **Frontend**: Changes to `.tsx`, `.ts`, and `.css` files are automatically reflected in the browser
+
+Source code is mounted as volumes, so you can edit files directly and see changes immediately.
+
+### Environment Variables
+
+All environment variables are configured in `docker-compose.yml` using the `.env` file. The Docker setup uses environment variables instead of `appsettings.Development.json` to keep sensitive data out of version control.
+
+**Note**: The `.env` file is already in `.gitignore` and will not be committed to the repository.
+
+### Troubleshooting
+
+#### Services won't start
+- Ensure Docker and Docker Compose are installed and running
+- Check that all required environment variables are set in `.env`
+- Verify ports 3000 and 3001 are not already in use
+
+#### Hot reload not working
+- Ensure source code volumes are properly mounted (check `docker-compose.yml`)
+- Try rebuilding containers: `docker-compose build --no-cache`
+
+#### Database connection issues
+- Verify `DB_CONNECTION_STRING` in `.env` is correct
+- Check that your database is accessible from Docker containers
+- For local PostgreSQL, use `host.docker.internal` instead of `localhost`
+
+#### Frontend can't connect to backend
+- Verify `NEXT_PUBLIC_API_URL` in `.env` matches backend URL
+- Check that both containers are on the same Docker network
+- Ensure backend is running and accessible on port 3000
+
+---
+
 ## 🔄 CI/CD Pipeline
 
 **GitHub Actions Workflow:**
