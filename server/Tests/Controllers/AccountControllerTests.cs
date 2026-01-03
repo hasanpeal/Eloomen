@@ -178,6 +178,34 @@ public class AccountControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task Register_WithUsernameMatchingExistingEmail_ReturnsBadRequest()
+    {
+        // Arrange
+        // Ensure test user is in database with a known email
+        var testUserEmail = "existing@example.com";
+        var testUser = TestHelpers.CreateTestUser(email: testUserEmail, username: "existinguser");
+        _dbContext.Users.Add(testUser);
+        await _dbContext.SaveChangesAsync();
+
+        var dto = new RegisterDTO
+        {
+            Username = testUserEmail, // Username matches existing email
+            Email = "newemail@example.com",
+            Password = "Password123!"
+        };
+
+        _userManagerMock.Setup(x => x.FindByEmailAsync(dto.Email)).ReturnsAsync((User?)null);
+        _userManagerMock.Setup(x => x.FindByNameAsync(dto.Username)).ReturnsAsync((User?)null);
+
+        // Act
+        var result = await _controller.Register(dto);
+
+        // Assert
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("Username taken", badRequest.Value);
+    }
+
+    [Fact]
     public async Task Login_WithValidCredentials_ReturnsToken()
     {
         // Arrange

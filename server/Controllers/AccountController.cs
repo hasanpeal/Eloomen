@@ -60,6 +60,15 @@ public class AccountController : ControllerBase
             return BadRequest("Account already exists");
         }
 
+        // Check if username matches any existing email
+        var existingUserWithEmailAsUsername = await _dbContext.Users
+            .FirstOrDefaultAsync(u => u.Email != null && u.Email.Equals(dto.Username, StringComparison.OrdinalIgnoreCase));
+        
+        if (existingUserWithEmailAsUsername != null)
+        {
+            return BadRequest("Username taken");
+        }
+
         var user = new User
         {
             UserName = dto.Username,
