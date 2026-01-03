@@ -15,6 +15,6 @@ COPY . .
 # Expose port
 EXPOSE 3000
 
-# Use dotnet watch for hot reload
-ENTRYPOINT ["dotnet", "watch", "run", "--urls", "http://0.0.0.0:3000", "--no-launch-profile"]
+# Use dotnet watch for hot reload (suppress warnings, only show errors)
+ENTRYPOINT ["dotnet", "watch", "run", "--urls", "http://0.0.0.0:3000", "--no-launch-profile", "--verbosity", "minimal"]
 

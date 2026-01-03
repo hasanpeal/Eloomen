@@ -101,7 +101,7 @@ export default function DeleteItemModal({
             disabled={loading}
             className="flex-1 px-4 py-3 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
-            {loading ? "Deleting..." : "Delete"}
+            {loading ? "Deleting" : "Delete"}
           </button>
         </div>
       </div>

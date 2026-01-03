@@ -800,48 +800,65 @@ The project includes a complete Docker setup with hot reload for both frontend a
 ### Prerequisites
 
 - **Docker** and **Docker Compose** installed
-- All environment variables configured (see below)
+- **`.env` file** created in the root directory (see setup below)
 
 ### Quick Start
 
-1. **Create a `.env` file** in the root directory with your environment variables:
+1. **Create a `.env` file** in the root directory of the project.
+
+   **Option A: Copy from `appsettings.development.json`**
+
+   If you already have `server/appsettings.development.json` configured, you can create the `.env` file by converting the JSON structure to environment variables. Use double underscores (`__`) for nested configuration keys.
+
+   **Option B: Create manually**
+
+   The `.env` file should contain all environment variables matching the structure of `server/appsettings.development.json`. Use double underscores (`__`) for nested configuration keys.
+
+   **Example `.env` file:**
 
    ```bash
-   # Database
-   DB_CONNECTION_STRING=User Id=postgres.xxx;Password=xxx;Server=xxx;Port=5432;Database=postgres
+   # Database Connection String
+   ConnectionStrings__Default=User Id=postgres.xxx;Password=xxx;Server=xxx;Port=5432;Database=postgres
 
-   # JWT
-   JWT_ISSUER=http://localhost:3000
-   JWT_AUDIENCE=http://localhost:3001
-   JWT_SIGNING_KEY=your-secret-signing-key-here
-   JWT_ACCESS_TOKEN_MINUTES=15
-   JWT_REFRESH_TOKEN_DAYS=30
+   # JWT Configuration
+   Jwt__Issuer=http://localhost:3000
+   Jwt__Audience=http://localhost:3001
+   Jwt__SigningKey=your-secret-signing-key-here
+   Jwt__AccessTokenMinutes=15
+   Jwt__RefreshTokenDays=30
 
-   # SendGrid
-   SENDGRID_API_KEY=SG.xxx
-   SENDGRID_FROM_EMAIL=support@eloomen.com
-   SENDGRID_FROM_NAME=Eloomen
-   SENDGRID_ADMIN_EMAIL=your-admin-email@example.com
+   # SendGrid Configuration
+   SendGrid__ApiKey=SG.xxx
+   SendGrid__FromEmail=support@eloomen.com
+   SendGrid__FromName=Eloomen
+   SendGrid__AdminEmail=your-admin-email@example.com
 
-   # App URLs
-   APP_BASE_URL=http://localhost:3001
-   APP_EMAIL_VERIFICATION_PATH=/verify-email
-   APP_DEVICE_VERIFICATION_PATH=/verify-device
-   APP_PASSWORD_RESET_PATH=/reset-password
-   EMAIL_VERIFICATION_MINUTES=1440
-   DEVICE_VERIFICATION_MINUTES=60
-   PASSWORD_RESET_MINUTES=60
+   # App Configuration
+   App__BaseUrl=http://localhost:3001
+   App__EmailVerificationPath=/verify-email
+   App__DeviceVerificationPath=/verify-device
+   App__PasswordResetPath=/reset-password
+   App__VerificationCodeExpiration__EmailVerificationMinutes=1440
+   App__VerificationCodeExpiration__DeviceVerificationMinutes=60
+   App__VerificationCodeExpiration__PasswordResetMinutes=60
 
-   # S3 / Cloudflare R2
-   S3_BUCKET_NAME=eloomen-dev
-   S3_BASE_URL=https://xxx.r2.cloudflarestorage.com
-   S3_ENDPOINT=https://xxx.r2.cloudflarestorage.com
-   S3_ACCESS_KEY_ID=xxx
-   S3_SECRET_ACCESS_KEY=xxx
+   # S3 / Cloudflare R2 Configuration
+   S3__BucketName=eloomen-dev
+   S3__BaseUrl=https://xxx.r2.cloudflarestorage.com
+   S3__Endpoint=https://xxx.r2.cloudflarestorage.com
+   S3__AccessKeyId=xxx
+   S3__SecretAccessKey=xxx
 
-   # Frontend
+   # Frontend Configuration
    NEXT_PUBLIC_API_URL=http://localhost:3000/api
    ```
+
+   **Important Notes:**
+
+   - The `.env` file is already in `.gitignore` and will not be committed to the repository
+   - Variable names use `__` (double underscore) for nested configuration (e.g., `ConnectionStrings__Default`, `Jwt__Issuer`)
+   - Copy values from `server/appsettings.development.json` and convert the JSON structure to environment variable format
+   - For nested objects, use `__` to separate levels (e.g., `App__VerificationCodeExpiration__EmailVerificationMinutes`)
 
 2. **Start all services** with Docker Compose:
 
@@ -850,15 +867,18 @@ The project includes a complete Docker setup with hot reload for both frontend a
    ```
 
    This will:
+
    - Build and start both frontend and backend services
    - Enable hot reload for both services (changes are reflected immediately)
    - Expose frontend on http://localhost:3001
    - Expose backend on http://localhost:3000
    - Automatically run database migrations on backend startup
+   - Load all environment variables from the `.env` file
 
 ### Services
 
 #### Backend (ASP.NET Core)
+
 - **Port**: 3000
 - **Hot Reload**: Enabled via `dotnet watch`
 - **Environment**: Development
@@ -866,6 +886,7 @@ The project includes a complete Docker setup with hot reload for both frontend a
 - **Swagger**: Available at http://localhost:3000/swagger
 
 #### Frontend (Next.js)
+
 - **Port**: 3001
 - **Hot Reload**: Enabled via Next.js dev mode
 - **API URL**: http://localhost:3000/api
@@ -905,27 +926,53 @@ Source code is mounted as volumes, so you can edit files directly and see change
 
 ### Environment Variables
 
-All environment variables are configured in `docker-compose.yml` using the `.env` file. The Docker setup uses environment variables instead of `appsettings.Development.json` to keep sensitive data out of version control.
+All environment variables are loaded from the `.env` file in the root directory. The `docker-compose.yml` uses `env_file: - .env` to automatically load all variables into both services.
 
-**Note**: The `.env` file is already in `.gitignore` and will not be committed to the repository.
+**Key Points:**
+
+- The `.env` file must be created in the root directory (same level as `docker-compose.yml`)
+- Variable names must match the structure of `appsettings.development.json` using `__` for nesting
+- The `.env` file is already in `.gitignore` and will not be committed to the repository
+- Both backend and frontend services read from the same `.env` file
+- Environment variables override `appsettings.development.json` when set
+
+**Converting from `appsettings.development.json` to `.env`:**
+
+| JSON Structure                                            | Environment Variable                                        |
+| --------------------------------------------------------- | ----------------------------------------------------------- |
+| `ConnectionStrings.Default`                               | `ConnectionStrings__Default`                                |
+| `Jwt.Issuer`                                              | `Jwt__Issuer`                                               |
+| `App.VerificationCodeExpiration.EmailVerificationMinutes` | `App__VerificationCodeExpiration__EmailVerificationMinutes` |
+
+**Quick Reference:**
+
+- Replace dots (`.`) with double underscores (`__`)
+- Keep the same structure and nesting
+- All string values should be unquoted
+- Copy exact values from `appsettings.development.json`
 
 ### Troubleshooting
 
 #### Services won't start
+
 - Ensure Docker and Docker Compose are installed and running
 - Check that all required environment variables are set in `.env`
 - Verify ports 3000 and 3001 are not already in use
 
 #### Hot reload not working
+
 - Ensure source code volumes are properly mounted (check `docker-compose.yml`)
 - Try rebuilding containers: `docker-compose build --no-cache`
 
 #### Database connection issues
-- Verify `DB_CONNECTION_STRING` in `.env` is correct
+
+- Verify `ConnectionStrings__Default` in `.env` is correct
 - Check that your database is accessible from Docker containers
 - For local PostgreSQL, use `host.docker.internal` instead of `localhost`
+- Ensure the connection string format matches: `User Id=xxx;Password=xxx;Server=xxx;Port=5432;Database=postgres`
 
 #### Frontend can't connect to backend
+
 - Verify `NEXT_PUBLIC_API_URL` in `.env` matches backend URL
 - Check that both containers are on the same Docker network
 - Ensure backend is running and accessible on port 3000

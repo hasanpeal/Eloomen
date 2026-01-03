@@ -15,35 +15,8 @@ services:
       - /app/bin
       - /app/obj
       - /app/node_modules
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      # ConnectionStrings
-      - ConnectionStrings__Default=${DB_CONNECTION_STRING}
-      # JWT
-      - Jwt__Issuer=${JWT_ISSUER}
-      - Jwt__Audience=${JWT_AUDIENCE}
-      - Jwt__SigningKey=${JWT_SIGNING_KEY}
-      - Jwt__AccessTokenMinutes=${JWT_ACCESS_TOKEN_MINUTES}
-      - Jwt__RefreshTokenDays=${JWT_REFRESH_TOKEN_DAYS}
-      # SendGrid
-      - SendGrid__ApiKey=${SENDGRID_API_KEY}
-      - SendGrid__FromEmail=${SENDGRID_FROM_EMAIL}
-      - SendGrid__FromName=${SENDGRID_FROM_NAME}
-      - SendGrid__AdminEmail=${SENDGRID_ADMIN_EMAIL}
-      # App
-      - App__BaseUrl=${APP_BASE_URL}
-      - App__EmailVerificationPath=${APP_EMAIL_VERIFICATION_PATH}
-      - App__DeviceVerificationPath=${APP_DEVICE_VERIFICATION_PATH}
-      - App__PasswordResetPath=${APP_PASSWORD_RESET_PATH}
-      - App__VerificationCodeExpiration__EmailVerificationMinutes=${EMAIL_VERIFICATION_MINUTES}
-      - App__VerificationCodeExpiration__DeviceVerificationMinutes=${DEVICE_VERIFICATION_MINUTES}
-      - App__VerificationCodeExpiration__PasswordResetMinutes=${PASSWORD_RESET_MINUTES}
-      # S3
-      - S3__BucketName=${S3_BUCKET_NAME}
-      - S3__BaseUrl=${S3_BASE_URL}
-      - S3__Endpoint=${S3_ENDPOINT}
-      - S3__AccessKeyId=${S3_ACCESS_KEY_ID}
-      - S3__SecretAccessKey=${S3_SECRET_ACCESS_KEY}
+    env_file:
+      - .env
     networks:
       - eloomen-network
     restart: unless-stopped
@@ -60,9 +33,8 @@ services:
       - ./client:/app
       - /app/node_modules
       - /app/.next
-    environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3000/api}
+    env_file:
+      - .env
     networks:
       - eloomen-network
     restart: unless-stopped

@@ -686,7 +686,7 @@ export default function VaultDetailPage() {
                   This vault is not accessible due to its release policy.
                 </p>
                 <p className="text-slate-500 text-sm">
-                  You will be redirected to the dashboard shortly...
+                  You will be redirected to the dashboard shortly
                 </p>
               </div>
               <Link
