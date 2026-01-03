@@ -43,6 +43,15 @@ builder.Services.AddDbContext<ApplicationDBContext>(options =>
 );
 
 // --------------------
+// Data Protection (for Identity tokens, etc.)
+// --------------------
+// Persist keys to database for production environments
+builder.Services.AddDataProtection()
+    .PersistKeysToDbContext<ApplicationDBContext>()
+    .SetApplicationName("Eloomen")
+    .SetDefaultKeyLifetime(TimeSpan.FromDays(90)); // Keys valid for 90 days
+
+// --------------------
 // Identity
 // --------------------
 builder.Services.AddIdentity<User, IdentityRole>(options =>
